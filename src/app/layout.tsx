@@ -31,6 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <>
                 <Link href="/items">Browse</Link>
                 <Link href="/items/mine">Your items</Link>
+                <Link href="/threads">Messages</Link>
                 <Link href="/invite">Suggest someone</Link>
                 {session.user.role === "admin" && (
                   <>

@@ -8,7 +8,7 @@ export type ThreadRole = "asker" | "owner";
 
 /** Where a thread is in its life, from the viewer's point of view. */
 export type ThreadStage =
-  | "before_pickup" // no loan, or a loan that is requested/approved
+  | "before_pickup" // no loan yet, or the latest loan is requested
   | "approved" // a loan is approved, not yet picked up
   | "picked_up" // a loan is active (or overdue) or returned
   | "closed"; // the latest loan is closed, declined, or cancelled
@@ -81,7 +81,7 @@ export const CANNED_CATEGORIES: CannedCategory[] = [
     messages: [
       { key: "return.on_way", text: "I'm on my way to return it." },
       { key: "return.extra_day", text: "I need an extra day; is that OK?" },
-      { key: "return.done", text: "Returned it; please check it over." },
+      { key: "return.done", text: "Returned it; please check it over and complete the loan." }, // PRD section 9 wording
     ],
   },
   {
