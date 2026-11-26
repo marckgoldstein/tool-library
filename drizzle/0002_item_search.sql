@@ -1,0 +1,2 @@
+ALTER TABLE "item" ADD COLUMN "search_vector" "tsvector" GENERATED ALWAYS AS (setweight(to_tsvector('english', coalesce("title", '')), 'A') || setweight(to_tsvector('english', coalesce("description", '')), 'B')) STORED NOT NULL;--> statement-breakpoint
+CREATE INDEX "item_search_idx" ON "item" USING gin ("search_vector");

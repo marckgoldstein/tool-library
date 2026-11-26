@@ -29,11 +29,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <nav aria-label="Main">
             {session?.user ? (
               <>
+                <Link href="/items">Browse</Link>
+                <Link href="/items/mine">Your items</Link>
                 <Link href="/invite">Suggest someone</Link>
                 {session.user.role === "admin" && (
-                  <Link href="/admin/invitations">
-                    Member suggestions{pending > 0 ? <span className="count"> {pending}</span> : null}
-                  </Link>
+                  <>
+                    <Link href="/admin/invitations">
+                      Member suggestions{pending > 0 ? <span className="count"> {pending}</span> : null}
+                    </Link>
+                    <Link href="/admin/members">Members</Link>
+                  </>
                 )}
                 <Link href="/profile">Your profile</Link>
                 <form

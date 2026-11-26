@@ -8,6 +8,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  customType,
   index,
   integer,
   jsonb,
@@ -28,6 +29,7 @@ const id = () =>
     .$defaultFn(() => crypto.randomUUID());
 const createdAt = () => timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow();
 const ts = () => timestamp({ withTimezone: true, mode: "date" });
+const tsvector = customType<{ data: string }>({ dataType: () => "tsvector" });
 
 // ---------- Enums ----------
 
@@ -185,9 +187,18 @@ export const items = pgTable(
       .notNull()
       .defaultNow()
       .$onUpdateFn(() => new Date()),
-    // Full-text search (S9) is added in M3 with its own migration.
+    // S9: full-text search over title (weight A) and description (weight B). Category names are matched in the query.
+    searchVector: tsvector()
+      .notNull()
+      .generatedAlwaysAs(
+        sql`setweight(to_tsvector('english', coalesce("title", '')), 'A') || setweight(to_tsvector('english', coalesce("description", '')), 'B')`,
+      ),
   },
-  (t) => [index().on(t.communityId, t.status), index().on(t.ownerId)],
+  (t) => [
+    index().on(t.communityId, t.status),
+    index().on(t.ownerId),
+    index("item_search_idx").using("gin", t.searchVector),
+  ],
 );
 
 export const itemPhotos = pgTable(

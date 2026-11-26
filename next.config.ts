@@ -11,8 +11,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["sharp", "pg"],
   experimental: {
-    // Profile and item photos go through server actions; photos.ts caps each at 10 MB (D32).
-    serverActions: { bodySizeLimit: "11mb" },
+    // Profile and item photos go through server actions: up to 4 photos a submit, 10 MB each (photos.ts, D32).
+    serverActions: { bodySizeLimit: "42mb" },
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
