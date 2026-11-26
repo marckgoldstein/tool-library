@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
+import { pendingCount } from "@/server/invitations/service";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
+  const pending = session?.user?.role === "admin" ? await pendingCount(session.user.id) : 0;
   return (
     <html lang="en">
       <body>
@@ -27,7 +29,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <nav aria-label="Main">
             {session?.user ? (
               <>
-                <span>{session.user.name ?? session.user.email}</span>
+                <Link href="/invite">Suggest someone</Link>
+                {session.user.role === "admin" && (
+                  <Link href="/admin/invitations">
+                    Member suggestions{pending > 0 ? <span className="count"> {pending}</span> : null}
+                  </Link>
+                )}
+                <span className="muted">{session.user.name ?? session.user.email}</span>
                 <form
                   action={async () => {
                     "use server";

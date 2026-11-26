@@ -138,7 +138,15 @@ export const invitations = pgTable(
     decidedBy: text().references(() => users.id),
     createdAt: createdAt(),
   },
-  (t) => [index().on(t.communityId, t.status), index().on(t.inviteeEmail)],
+  (t) => [
+    index().on(t.communityId, t.status),
+    index().on(t.inviteeEmail),
+    // S1: one open invitation per address per group. Expired links are marked
+    // "expired" before a new suggestion is checked, so they don't block it.
+    uniqueIndex("invitation_open_email_idx")
+      .on(t.communityId, t.inviteeEmail)
+      .where(sql`${t.status} in ('pending_admin', 'approved')`),
+  ],
 );
 
 // ---------- Items ----------

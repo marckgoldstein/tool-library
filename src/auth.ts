@@ -15,6 +15,7 @@ import { and, count, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { accounts, emailLog, sessions, users, verificationTokens } from "@/db/schema";
 import { sendEmail } from "@/server/email/transport";
+import { normalizeEmail } from "@/server/email/normalize";
 
 declare module "next-auth" {
   interface Session {
@@ -25,7 +26,7 @@ declare module "next-auth" {
 const LINK_MAX_AGE_SECONDS = 15 * 60;
 const LINKS_PER_WINDOW = 5;
 
-export const normalizeEmail = (email: string) => email.trim().toLowerCase();
+export { normalizeEmail };
 
 async function activeUserByEmail(email: string) {
   const [user] = await db.select().from(users).where(eq(users.email, normalizeEmail(email)));

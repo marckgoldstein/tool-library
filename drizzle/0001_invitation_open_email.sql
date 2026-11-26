@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "invitation_open_email_idx" ON "invitation" USING btree ("community_id","invitee_email") WHERE "invitation"."status" in ('pending_admin', 'approved');

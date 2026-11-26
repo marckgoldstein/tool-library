@@ -4,13 +4,21 @@ import { devMailboxEnabled } from "@/server/email/dev-mailbox";
 
 export const metadata: Metadata = { title: "Check your email" };
 
-export default function CheckEmailPage() {
+export default async function CheckEmailPage({ searchParams }: { searchParams: Promise<{ joined?: string }> }) {
+  const joined = (await searchParams).joined === "1";
   return (
     <>
       <h1>Check your email</h1>
-      <p>
-        If that address belongs to a member, a sign-in link is on its way. It works once and expires in 15 minutes.
-      </p>
+      {joined ? (
+        <p>
+          Welcome to the group. We&apos;ve emailed a sign-in link to the address your invite went to. It works once
+          and expires in 15 minutes.
+        </p>
+      ) : (
+        <p>
+          If that address belongs to a member, a sign-in link is on its way. It works once and expires in 15 minutes.
+        </p>
+      )}
       <p>Not there after a minute? Check your spam or junk folder, then try again.</p>
       {devMailboxEnabled() && (
         <p className="notice warn">

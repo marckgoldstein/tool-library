@@ -101,6 +101,49 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .timeline li { display: grid; grid-template-columns: 11rem 1fr; gap: var(--space-3); font-variant-numeric: tabular-nums; }
 @media (max-width: 36rem) { .timeline li { grid-template-columns: 1fr; gap: 0; } }
 
+/* ---------- Forms (M2) ---------- */
+form.stack.wide { max-width: 34rem; }
+.field { display: grid; gap: var(--space-1); }
+.field .hint, .field .error-msg { margin: 0; }
+.field.check { grid-template-columns: auto 1fr; align-items: start; column-gap: var(--space-2); }
+.field.check input { width: 1.25rem; height: 1.25rem; margin-top: 0.2rem; }
+.field.check label { font-weight: 600; }
+.field.check .error-msg { grid-column: 1 / -1; }
+input[type="file"] { font: inherit; max-width: 100%; }
+input, select, textarea { font-size: max(1rem, 1em); }
+fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-3) var(--space-4) var(--space-4); margin: 0; display: grid; gap: var(--space-3); background: var(--panel); }
+legend { font-weight: 700; padding: 0 var(--space-2); margin-left: calc(-1 * var(--space-2)); }
+fieldset > .hint { margin: 0; }
+
+/* Errors show only after the person has interacted (:user-invalid), with words, not color alone. */
+.error-msg { display: none; color: var(--danger); font-weight: 600; font-size: 0.9rem; }
+.error-msg::before { content: "Error: "; }
+:is(:user-invalid, .user-invalid-fallback) ~ .error-msg { display: block; }
+:is(input, select, textarea):is(:user-invalid, .user-invalid-fallback) { border-color: var(--danger); }
+input[type="checkbox"]:is(:user-invalid, .user-invalid-fallback) { outline: 2px solid var(--danger); outline-offset: 2px; }
+.error-text:focus, .notice:focus { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.notice.success { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.notices { display: grid; gap: var(--space-2); }
+.notices h3 { font-size: 1rem; margin: 0 0 var(--space-1); }
+.notices p { margin: 0; color: var(--ink-soft); }
+
+.muted { color: var(--ink-soft); font-weight: 400; }
+.count { display: inline-block; min-width: 1.4em; padding: 0 0.4em; margin-left: 0.25em; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 0.8rem; font-weight: 700; text-align: center; }
+
+/* ---------- Lists (M2) ---------- */
+.rows { list-style: none; padding: 0; margin: 0 0 var(--space-4); border-top: 1px solid var(--line); }
+.rows li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--line); }
+.rows li > :first-child { flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere; }
+.cards { list-style: none; padding: 0; margin: 0 0 var(--space-4); display: grid; gap: var(--space-3); }
+.cards h3 { margin: 0 0 var(--space-2); font-size: 1.1rem; }
+.cards .details { margin-bottom: var(--space-3); }
+.cards dd { overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.status[data-status="pending_admin"], .status[data-status="approved"] { color: var(--accent); border-color: currentColor; }
+.status[data-status="expired"] { color: var(--warn); border-color: currentColor; }
+.status[data-status="accepted"] { color: var(--accent); }
+
 .mail { display: grid; gap: var(--space-3); padding: 0; list-style: none; }
 .mail pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

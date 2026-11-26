@@ -10,6 +10,10 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["sharp", "pg"],
+  experimental: {
+    // Profile and item photos go through server actions; photos.ts caps each at 10 MB (D32).
+    serverActions: { bodySizeLimit: "11mb" },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
