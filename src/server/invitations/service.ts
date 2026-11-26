@@ -14,7 +14,7 @@ import { normalizeEmail } from "@/server/email/normalize";
 import { sendEmail, type OutgoingEmail } from "@/server/email/transport";
 import { DomainError, forbidden, notFound } from "../errors";
 
-/** How long an approved invite link works. The PRD says links expire but sets no duration (proposed D37). */
+/** How long an approved invite link works (D37). */
 export const INVITE_LINK_DAYS = 7;
 export const DEFAULT_TIMEZONE = "America/New_York"; // R7 pilot default
 export const GENERAL_AREA_MAX = 40; // R8
