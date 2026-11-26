@@ -35,7 +35,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     Member suggestions{pending > 0 ? <span className="count"> {pending}</span> : null}
                   </Link>
                 )}
-                <span className="muted">{session.user.name ?? session.user.email}</span>
+                <Link href="/profile">Your profile</Link>
                 <form
                   action={async () => {
                     "use server";

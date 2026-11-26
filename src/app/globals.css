@@ -144,6 +144,14 @@ input[type="checkbox"]:is(:user-invalid, .user-invalid-fallback) { outline: 2px 
 .status[data-status="expired"] { color: var(--warn); border-color: currentColor; }
 .status[data-status="accepted"] { color: var(--accent); }
 
+/* ---------- Profiles (M2) ---------- */
+.profile-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.profile-head h1 { margin: 0; overflow-wrap: anywhere; }
+.profile-head p { margin: 0; }
+.avatar { flex: none; border-radius: 50%; object-fit: cover; background: var(--panel); border: 1px solid var(--line); }
+.avatar.initials { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+input[type="tel"] { font-variant-numeric: tabular-nums; }
+
 .mail { display: grid; gap: var(--space-3); padding: 0; list-style: none; }
 .mail pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

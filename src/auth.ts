@@ -24,7 +24,8 @@ declare module "next-auth" {
 }
 
 const LINK_MAX_AGE_SECONDS = 15 * 60;
-const LINKS_PER_WINDOW = 5;
+/** T4: 5 links per address per window. Only the browser tests raise it (.env.test), as they sign the same people in many times. */
+const LINKS_PER_WINDOW = Number(process.env.AUTH_LINKS_PER_WINDOW) || 5;
 
 export { normalizeEmail };
 
