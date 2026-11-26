@@ -38,7 +38,15 @@ export default async function HomePage() {
           <li key={g.id}>{g.name}</li>
         ))}
       </ul>
-      <p className="notice">Listings, search, and requests arrive in the next milestones.</p>
+      <p className="actions">
+        <Link className="button" href="/items">
+          Browse items
+        </Link>
+        <Link className="button secondary" href="/items/new">
+          List an item
+        </Link>
+      </p>
+      <p className="notice">Messaging owners and requesting dates arrive in the next milestones.</p>
     </>
   );
 }

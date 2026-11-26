@@ -15,6 +15,13 @@
       "when": 1795705664607,
       "tag": "0001_invitation_open_email",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795711668641,
+      "tag": "0002_item_search",
+      "breakpoints": true
     }
   ]
 }
