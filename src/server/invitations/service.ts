@@ -10,15 +10,15 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import { communities, invitations, memberships, users } from "@/db/schema";
-import { normalizeEmail } from "@/server/email/normalize";
 import { sendEmail, type OutgoingEmail } from "@/server/email/transport";
 import { DomainError, forbidden, notFound } from "../errors";
+import { GENERAL_AREA_MAX, NAME_MAX, cleanEmail, cleanGeneralArea, cleanName } from "../profiles/validation";
+
+export { GENERAL_AREA_MAX, NAME_MAX };
 
 /** How long an approved invite link works (D37). */
 export const INVITE_LINK_DAYS = 7;
 export const DEFAULT_TIMEZONE = "America/New_York"; // R7 pilot default
-export const GENERAL_AREA_MAX = 40; // R8
-export const NAME_MAX = 60;
 
 type Invitation = typeof invitations.$inferSelect;
 
@@ -81,21 +81,6 @@ async function expireStaleLinks(tx: Tx, communityId: string, now: Date) {
     .update(invitations)
     .set({ status: "expired", tokenHash: null })
     .where(and(eq(invitations.communityId, communityId), eq(invitations.status, "approved"), lt(invitations.expiresAt, now)));
-}
-
-function cleanName(value: string, what: string): string {
-  const trimmed = value.trim().replace(/\s+/g, " ");
-  if (!trimmed) throw new DomainError("invalid_input", `Enter ${what}.`);
-  if (trimmed.length > NAME_MAX) throw new DomainError("invalid_input", `Keep ${what} to ${NAME_MAX} characters or fewer.`);
-  return trimmed;
-}
-
-function cleanEmail(value: string): string {
-  const email = normalizeEmail(value);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
-    throw new DomainError("invalid_input", "Enter a valid email address, like name@example.com.");
-  }
-  return email;
 }
 
 /** Postgres unique_violation; Drizzle wraps the driver error, so look through `cause`. */
@@ -313,11 +298,7 @@ export interface JoinInput {
 
 export function validateJoin(input: JoinInput) {
   const displayName = cleanName(input.displayName, "a display name");
-  const generalArea = input.generalArea.trim().replace(/\s+/g, " ");
-  if (!generalArea) throw new DomainError("invalid_input", "Enter your general area, like a town or neighborhood.");
-  if (generalArea.length > GENERAL_AREA_MAX) {
-    throw new DomainError("invalid_input", `Keep your general area to ${GENERAL_AREA_MAX} characters, like a town or neighborhood.`);
-  }
+  const generalArea = cleanGeneralArea(input.generalArea);
   if (!input.acceptedNotices) throw new DomainError("invalid_input", "Tick the box to accept the notices before joining.");
   return { displayName, generalArea, timezone: cleanTimezone(input.timezone) };
 }
