@@ -9,6 +9,7 @@ import { DomainError } from "@/server/errors";
 import { getItem, type ItemView } from "@/server/items/service";
 import { photoUrl } from "@/server/storage/photos";
 import { itemStatusAction, type ItemResult } from "../actions";
+import { askOwnerAction } from "../../threads/actions";
 
 export const metadata: Metadata = { title: "Item" };
 export const dynamic = "force-dynamic";
@@ -143,7 +144,11 @@ export default async function ItemPage({
           <p className="notice">
             <strong>{lendingRisk.title}:</strong> {lendingRisk.body}
           </p>
-          <p className="muted">Messaging the owner and requesting dates arrive in the next milestones.</p>
+          <form action={askOwnerAction}>
+            <input type="hidden" name="itemId" value={item.id} />
+            <SubmitButton pendingLabel="Opening…">Ask the owner</SubmitButton>
+          </form>
+          <p className="hint">Questions use a short list of set messages. Requesting dates arrives in the next milestone.</p>
         </section>
       )}
     </>
