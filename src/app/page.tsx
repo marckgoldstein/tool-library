@@ -46,7 +46,9 @@ export default async function HomePage() {
           List an item
         </Link>
       </p>
-      <p className="notice">Messaging owners and requesting dates arrive in the next milestones.</p>
+      <p>
+        Questions about something? Open it and ask the owner; replies land in <Link href="/threads">Messages</Link>.
+      </p>
     </>
   );
 }

@@ -9,33 +9,45 @@ import { JoinForm } from "./join-form";
 export const metadata: Metadata = { title: "Join", robots: { index: false }, referrer: "no-referrer" };
 export const dynamic = "force-dynamic";
 
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 /** S3: an approved invitee joins from their single-use link. */
 export default async function JoinPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const invite = await lookupInvite(token);
 
   if (!invite.ok) {
+    const expired = invite.reason === "expired";
     return (
       <>
-        <h1>This invite link has expired or was already used</h1>
+        <h1>{expired ? "This invite link has expired" : "This invite link isn't valid"}</h1>
         <p>
-          Invite links work once and expire after a week. If you already joined,{" "}
-          <Link href="/sign-in">sign in with your email</Link>. Otherwise, ask the person who suggested you to let the
-          admin know, and the admin can send you a new link.
+          {expired
+            ? "Invite links work for a week. The admin can send you a new one."
+            : "It may have been used already, or part of it may be missing. Check that you opened the whole link from your email."}
+        </p>
+        <p>
+          Already joined? <Link href="/sign-in">Sign in with your email</Link>. Otherwise, ask the person who suggested
+          you to let the admin know, and the admin can send you a new link.
         </p>
       </>
     );
   }
 
   const session = await auth();
+  const { memberCount, itemCount, invitation } = invite;
   return (
     <>
-      <h1 id="join-heading">Join {invite.communityName}</h1>
-      <p>
-        You&apos;ve been invited to a private group that lends tools and gear to each other. No fees, no deposits;
-        owners approve every loan. Set up your profile, accept the notices, and we&apos;ll email you a link to sign
-        in. We don&apos;t collect your address.
+      <h1 id="join-heading">Welcome to {invite.communityName}</h1>
+      <p className="lead">
+        You&apos;re invited to a private group of friends and family who lend each other tools and gear.{" "}
+        {memberCount > 0 && (
+          <strong data-testid="group-size">
+            {plural(memberCount, "member is", "members are")} sharing {plural(itemCount, "item", "items")}.
+          </strong>
+        )}
       </p>
+      <p>No fees, no deposits, and owners approve every loan. Set up your profile below and we&apos;ll email your sign-in link to <strong>{invitation.inviteeEmail}</strong>.</p>
       {session?.user && (
         <p className="notice warn">
           You&apos;re signed in as someone else. Sign out first if this invite is for a different person.
@@ -44,7 +56,7 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
       <FormValidation />
       <JoinForm
         token={token}
-        suggestedName={invite.invitation.inviteeName}
+        suggestedName={invitation.inviteeName}
         notices={JOIN_NOTICES}
         generalAreaMax={GENERAL_AREA_MAX}
       />

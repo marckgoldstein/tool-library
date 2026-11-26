@@ -26,7 +26,7 @@ export async function seed() {
       category, invitation, membership, community, user_contact, email_log,
       auth_session, auth_account, auth_verification_token, app_user RESTART IDENTITY CASCADE`);
 
-  const [group] = await db.insert(communities).values({ name: "Friends & Family Pilot" }).returning();
+  const [group] = await db.insert(communities).values({ name: "Friends & Family" }).returning();
   const created: Record<keyof typeof SEED_USERS, typeof users.$inferSelect> = {} as never;
   for (const [key, u] of Object.entries(SEED_USERS) as [keyof typeof SEED_USERS, (typeof SEED_USERS)[keyof typeof SEED_USERS]][]) {
     const [row] = await db

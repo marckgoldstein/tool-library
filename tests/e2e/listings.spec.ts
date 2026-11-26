@@ -9,7 +9,7 @@ test.describe("M3 listings and search (S7, S8, S9)", () => {
     await signInAs(page, USERS.owner);
     await page.goto("/items/new");
     await expect(page.getByRole("heading", { name: "Items that can't be listed" })).toBeVisible();
-    await expect(page.getByText(/Weapons, Vehicles, Hazardous materials, Medical devices, Consumables/)).toBeVisible();
+    await expect(page.getByText(/Weapons, vehicles, hazardous materials, medical devices and consumables/)).toBeVisible();
     await page.getByLabel("Title").fill(title);
     await page.getByLabel("Category").selectOption({ label: "Sanders and grinders" });
     await page.getByLabel("Description").fill("5-inch random orbit sander with a pack of 120-grit discs.");
@@ -30,10 +30,14 @@ test.describe("M3 listings and search (S7, S8, S9)", () => {
     await page.getByRole("searchbox", { name: "Search", exact: true }).fill(title);
     await page.getByRole("button", { name: "Search" }).click();
     const card = page.getByTestId("results").getByRole("listitem").filter({ hasText: title });
-    await expect(card).toContainText("Maplewood");
+    // Whose it is, not just where (the initials avatar is aria-hidden, so check the label text).
+    await expect(card.getByTestId("card-owner").locator("span:not(.avatar)")).toHaveText("Olivia · Maplewood");
     await page.goto(`/items?category=&q=${encodeURIComponent("random orbit")}`);
     await expect(page.getByTestId("results")).toContainText(title); // description match
+    await page.goto(`/items?q=${encodeURIComponent("no such thing anywhere")}`);
+    await expect(page.getByRole("link", { name: "Clear search" })).toBeVisible();
     await page.goto(itemUrl);
+    await expect(page.getByRole("button", { name: "Ask Olivia about it" })).toBeVisible();
     await expect(page.getByText("Lending risk:")).toBeVisible(); // PRD section 10: shown on the item page
 
     // S8: the owner pauses it; it drops out of search.
@@ -64,6 +68,7 @@ test.describe("M3 listings and search (S7, S8, S9)", () => {
     await page.getByRole("button", { name: "Delist…" }).click();
     const dialog = page.getByRole("dialog", { name: /Delist/ });
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Keep it listed" })).toBeFocused();
     await dialog.getByRole("button", { name: "Delist item" }).click();
     await expect(page.getByTestId("mine-result")).toContainText("Delisted.");
     await expect(page.getByTestId("my-items").or(page.getByText("You haven't listed anything yet."))).not.toContainText(title);
@@ -74,7 +79,8 @@ test.describe("M3 listings and search (S7, S8, S9)", () => {
     await page.goto("/items/mine");
     await page.getByRole("link", { name: "Wet tile saw" }).click(); // seeded with an active loan
     await expect(page.getByTestId("item-status")).toHaveText("On loan");
-    await expect(page.getByText("can't be edited, paused or delisted until the loan closes")).toBeVisible();
+    await expect(page.getByTestId("locked-notice")).toContainText(/With Ben · (due back|overdue since)/); // who has it, and until when
+    await expect(page.getByTestId("locked-notice").getByRole("link", { name: "See the loan" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Pause listing" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "Edit item" })).toHaveCount(0);
   });

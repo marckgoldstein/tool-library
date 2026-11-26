@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { SubmitButton } from "@/components/submit-button";
+import { useKeptFormAction } from "@/components/use-kept-form";
 import { saveContactsAction, saveProfileAction, type FormState } from "./actions";
 
 const initial: FormState = { status: "idle" };
@@ -36,13 +37,13 @@ export function ProfileForm({
   hasPhoto: boolean;
   generalAreaMax: number;
 }) {
-  const [state, action] = useActionState(saveProfileAction, initial);
-  const v = state.status === "error" ? state.values : undefined;
-  const key = v ? JSON.stringify(v) : `${name}|${generalArea}`;
+  // Kept form: an error leaves typed values and the chosen photo in place; a save remounts from the new values.
+  const { state, formAction, onSubmit, pending } = useKeptFormAction(saveProfileAction, initial);
+  const key = `${name}|${generalArea}|${hasPhoto}`;
   return (
-    <form className="stack wide" action={action} aria-labelledby="profile-heading">
+    <form className="stack wide" action={formAction} onSubmit={onSubmit} aria-labelledby="profile-heading" key={key}>
       <Result state={state} testId="profile-result" />
-      <div className="field" key={`n-${key}`}>
+      <div className="field">
         <label htmlFor="displayName">Display name</label>
         <input
           id="displayName"
@@ -51,14 +52,14 @@ export function ProfileForm({
           autoComplete="name"
           required
           maxLength={60}
-          defaultValue={v?.displayName ?? name}
+          defaultValue={name}
           data-error="displayName-error"
         />
         <p id="displayName-error" className="error-msg">
           Enter the name other members will see.
         </p>
       </div>
-      <div className="field" key={`a-${key}`}>
+      <div className="field">
         <label htmlFor="generalArea">General area</label>
         <input
           id="generalArea"
@@ -67,7 +68,7 @@ export function ProfileForm({
           autoComplete="off"
           required
           maxLength={generalAreaMax}
-          defaultValue={v?.generalArea ?? generalArea}
+          defaultValue={generalArea}
           aria-describedby="generalArea-hint"
           data-error="generalArea-error"
         />
@@ -99,7 +100,9 @@ export function ProfileForm({
           <label htmlFor="removePhoto">Remove my photo</label>
         </div>
       )}
-      <SubmitButton pendingLabel="Saving…">Save profile</SubmitButton>
+      <SubmitButton pendingLabel="Saving…" pending={pending}>
+        Save profile
+      </SubmitButton>
     </form>
   );
 }

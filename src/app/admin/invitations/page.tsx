@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/auth";
+import { ConfirmAction } from "@/components/confirm-action";
 import { SubmitButton } from "@/components/submit-button";
 import { activeMembership, cleanTimezone, listForAdmin } from "@/server/invitations/service";
 import { decideAction, type DecideResult } from "./actions";
@@ -75,15 +76,30 @@ export default async function AdminInvitationsPage({
                   <time dateTime={r.createdAt.toISOString()}>{dateFmt.format(r.createdAt)}</time>
                 </dd>
               </dl>
-              <form action={decideAction} className="actions">
-                <input type="hidden" name="invitationId" value={r.id} />
-                <SubmitButton name="decision" value="approve" pendingLabel="Sending invite…">
-                  Approve and send invite
-                </SubmitButton>
-                <SubmitButton name="decision" value="decline" className="secondary">
-                  Decline
-                </SubmitButton>
-              </form>
+              <div className="actions">
+                <form action={decideAction}>
+                  <input type="hidden" name="invitationId" value={r.id} />
+                  <SubmitButton name="decision" value="approve" pendingLabel="Sending invite…">
+                    Approve and send invite
+                  </SubmitButton>
+                </form>
+                <ConfirmAction
+                  label="Decline…"
+                  title={`Decline the suggestion for ${r.inviteeName}?`}
+                  confirmLabel="Decline suggestion"
+                  pendingLabel="Declining…"
+                  cancelLabel="Keep it for now"
+                  action={decideAction}
+                  fields={{ invitationId: r.id, decision: "decline" }}
+                  danger
+                >
+                  <p>
+                    We&apos;ll email {r.suggestedByName ?? "the member who suggested them"} that it wasn&apos;t approved.{" "}
+                    {r.inviteeName} won&apos;t be told anything.
+                  </p>
+                  <p>This can&apos;t be undone, but a member can suggest them again later.</p>
+                </ConfirmAction>
+              </div>
             </li>
           ))}
         </ul>

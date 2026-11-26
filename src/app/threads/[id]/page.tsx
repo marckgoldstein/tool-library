@@ -136,6 +136,8 @@ export default async function ThreadPage({
                       label={label}
                       title={`Send your ${type === "phone" ? "phone number" : "email"} to ${thread.other.name}?`}
                       confirmLabel={label}
+                      pendingLabel="Sending…"
+                      cancelLabel="Don't send"
                       action={shareContactAction}
                       fields={{ threadId: thread.id, contactType: type }}
                     >

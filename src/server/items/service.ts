@@ -11,7 +11,7 @@
 import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db, type Tx } from "@/db";
-import { categories, itemPhotos, items, memberships, users } from "@/db/schema";
+import { categories, itemPhotos, items, loans, memberships, users } from "@/db/schema";
 import { DomainError, forbidden, notFound } from "../errors";
 import { isListingLocked } from "../loans/service";
 
@@ -160,6 +160,8 @@ export interface ItemView {
   photos: { id: string; storageKey: string }[];
   isOwner: boolean;
   locked: boolean;
+  /** Owner only: who has it and until when, when a loan locks the listing. */
+  lockingLoan: LockingLoan | null;
 }
 
 /** An item as a group member sees it. Paused items show only to their owner; delisted ones to nobody but the owner. */
@@ -207,6 +209,7 @@ export async function getItem(viewerId: string, itemId: string): Promise<ItemVie
     photos,
     isOwner,
     locked: isOwner ? await isListingLocked(item.id) : false,
+    lockingLoan: isOwner ? ((await lockingLoansFor([item.id])).get(item.id) ?? null) : null,
   };
 }
 
@@ -218,12 +221,16 @@ export interface SearchResult {
   ownerId: string;
   ownerName: string;
   ownerArea: string | null;
+  ownerPhotoKey: string | null;
   photoKey: string | null;
   isOwn: boolean;
 }
 
-/** S9: keyword and category search within the member's group. */
-export async function searchItems(viewerId: string, query: { q?: string; categoryId?: string }): Promise<SearchResult[]> {
+/** S9: keyword and category search within the member's group. `ownerId` narrows to one member's listings (profile page). */
+export async function searchItems(
+  viewerId: string,
+  query: { q?: string; categoryId?: string; ownerId?: string },
+): Promise<SearchResult[]> {
   const communityId = await memberGroup(viewerId);
   const q = query.q?.trim().slice(0, 200) ?? "";
   const tsq = sql`websearch_to_tsquery('english', ${q})`;
@@ -238,6 +245,7 @@ export async function searchItems(viewerId: string, query: { q?: string; categor
   if (query.categoryId) {
     conditions.push(or(eq(items.categoryId, query.categoryId), eq(categories.parentId, query.categoryId))!);
   }
+  if (query.ownerId) conditions.push(eq(items.ownerId, query.ownerId));
   const firstPhoto = sql<string | null>`(select ${itemPhotos.storageKey} from ${itemPhotos} where ${itemPhotos.itemId} = ${items.id} order by ${itemPhotos.sortOrder} limit 1)`;
   const rows = await db
     .select({
@@ -248,6 +256,7 @@ export async function searchItems(viewerId: string, query: { q?: string; categor
       ownerId: items.ownerId,
       ownerName: owner.name,
       ownerArea: owner.generalArea,
+      ownerPhotoKey: owner.image,
       photoKey: firstPhoto,
     })
     .from(items)
@@ -261,8 +270,55 @@ export async function searchItems(viewerId: string, query: { q?: string; categor
   return rows.map((r) => ({ ...r, ownerName: r.ownerName ?? "Member", isOwn: r.ownerId === viewerId }));
 }
 
-/** The owner's own items, every status but delisted. */
+export interface LockingLoan {
+  id: string;
+  status: "approved" | "active" | "returned";
+  borrowerName: string;
+  startAt: Date;
+  endAt: Date;
+}
+
+/**
+ * For the owner only: the loan that locks each listing (approved, active or returned; D23),
+ * so "On loan" can say who has it and when it's due back.
+ */
+async function lockingLoansFor(itemIds: string[]): Promise<Map<string, LockingLoan>> {
+  if (itemIds.length === 0) return new Map();
+  const borrower = alias(users, "borrower");
+  const rows = await db
+    .select({
+      id: loans.id,
+      itemId: loans.itemId,
+      status: loans.status,
+      borrowerName: borrower.name,
+      startAt: loans.startAt,
+      endAt: loans.endAt,
+    })
+    .from(loans)
+    .innerJoin(borrower, eq(borrower.id, loans.borrowerId))
+    .where(and(inArray(loans.itemId, itemIds), inArray(loans.status, ["active", "returned", "approved"])))
+    .orderBy(asc(loans.startAt));
+  // Prefer the loan in hand (active/returned) over a later approved one.
+  const rank = { active: 0, returned: 1, approved: 2 } as const;
+  const map = new Map<string, LockingLoan>();
+  for (const r of rows) {
+    const status = r.status as LockingLoan["status"];
+    const current = map.get(r.itemId);
+    if (!current || rank[status] < rank[current.status]) {
+      map.set(r.itemId, { id: r.id, status, borrowerName: r.borrowerName ?? "A member", startAt: r.startAt, endAt: r.endAt });
+    }
+  }
+  return map;
+}
+
+/** The owner's own items, every status but delisted, with the loan that locks each (if any). */
 export async function listOwnItems(ownerId: string) {
+  const rows = await listOwnItemRows(ownerId);
+  const locks = await lockingLoansFor(rows.map((r) => r.id));
+  return rows.map((r) => ({ ...r, lockingLoan: locks.get(r.id) ?? null }));
+}
+
+async function listOwnItemRows(ownerId: string) {
   return db
     .select({
       id: items.id,

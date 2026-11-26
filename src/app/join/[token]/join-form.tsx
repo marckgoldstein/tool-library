@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { SubmitButton } from "@/components/submit-button";
 import { TimezoneField } from "@/components/timezone-field";
+import { useKeptFormAction } from "@/components/use-kept-form";
 import type { Notice } from "@/content/notices";
 import { joinAction, type JoinState } from "./actions";
 
@@ -20,16 +21,15 @@ export function JoinForm({
   notices: Notice[];
   generalAreaMax: number;
 }) {
-  const [state, action] = useActionState(joinAction.bind(null, token), initial);
+  // Kept form: after a server error, typed values and the chosen photo stay in place.
+  const { state, formAction, onSubmit, pending } = useKeptFormAction(joinAction.bind(null, token), initial);
   const errorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     if (state.status === "error") errorRef.current?.focus();
   }, [state]);
-  const v = state.values;
-  const key = state.status === "error" ? JSON.stringify(v) : "fresh";
 
   return (
-    <form className="stack wide" action={action} aria-labelledby="join-heading">
+    <form className="stack wide" action={formAction} onSubmit={onSubmit} aria-labelledby="join-heading">
       {state.status === "error" && (
         <p ref={errorRef} tabIndex={-1} role="alert" className="error-text" data-testid="join-error">
           {state.message}
@@ -37,7 +37,7 @@ export function JoinForm({
       )}
       <TimezoneField />
 
-      <fieldset key={`profile-${key}`}>
+      <fieldset>
         <legend>Your profile</legend>
         <p className="hint">Other members see these on your profile and your listings.</p>
         <div className="field">
@@ -49,7 +49,7 @@ export function JoinForm({
             autoComplete="name"
             required
             maxLength={60}
-            defaultValue={v?.displayName ?? suggestedName}
+            defaultValue={suggestedName}
             data-error="displayName-error"
           />
           <p id="displayName-error" className="error-msg">
@@ -65,7 +65,6 @@ export function JoinForm({
             autoComplete="off"
             required
             maxLength={generalAreaMax}
-            defaultValue={v?.generalArea}
             aria-describedby="generalArea-hint"
             data-error="generalArea-error"
           />
@@ -94,22 +93,27 @@ export function JoinForm({
         </div>
       </fieldset>
 
-      <fieldset key={`notices-${key}`}>
+      <fieldset>
         <legend>Before you join</legend>
+        <p className="hint">A few plain-language notices. Open any of them to read it in full.</p>
         <div className="notices">
           {notices.map((n) => (
-            <section key={n.id} aria-labelledby={`join-notice-${n.id}`}>
-              <h3 id={`join-notice-${n.id}`}>{n.title}</h3>
+            <details key={n.id}>
+              <summary>
+                <span>
+                  <strong>{n.title}:</strong> {n.summary}
+                </span>
+              </summary>
               <p>{n.body}</p>
-            </section>
+            </details>
           ))}
-          <p>
-            <Link href="/notices" target="_blank">
-              Read all notices and how we use your data
-            </Link>{" "}
-            (opens in a new tab)
-          </p>
         </div>
+        <p className="hint">
+          <Link href="/notices" target="_blank">
+            All notices and how we use your data
+          </Link>{" "}
+          (opens in a new tab)
+        </p>
         <div className="field check">
           <input
             id="acceptNotices"
@@ -117,7 +121,6 @@ export function JoinForm({
             type="checkbox"
             value="yes"
             required
-            defaultChecked={v?.acceptedNotices}
             data-error="acceptNotices-error"
           />
           <label htmlFor="acceptNotices">I&apos;ve read these notices and accept them</label>
@@ -127,7 +130,9 @@ export function JoinForm({
         </div>
       </fieldset>
 
-      <SubmitButton pendingLabel="Joining…">Join and email me a sign-in link</SubmitButton>
+      <SubmitButton pendingLabel="Joining…" pending={pending}>
+        Join and email me a sign-in link
+      </SubmitButton>
     </form>
   );
 }

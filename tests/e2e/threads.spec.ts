@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signInAs, USERS } from "./helpers";
+import { navLink, signInAs, USERS } from "./helpers";
 
 const NOTE = "Only contact this person if you are ready to give them your contact details.";
 
@@ -9,7 +9,7 @@ test.describe("M4 threads and contact sharing (S10, S11)", () => {
     await signInAs(page, USERS.borrower);
     await page.goto("/items?q=tent");
     await page.getByTestId("results").getByRole("link", { name: /4-person tent/ }).click();
-    await page.getByRole("button", { name: "Ask the owner" }).click();
+    await page.getByRole("button", { name: "Ask Oscar about it" }).click();
     await expect(page).toHaveURL(/\/threads\//);
     await expect(page.getByRole("heading", { level: 3, name: "Ask about the item" })).toBeVisible();
     // Only the asker's options before a loan: no answers, no return messages, no free text.
@@ -25,7 +25,7 @@ test.describe("M4 threads and contact sharing (S10, S11)", () => {
     await expect(page.getByTestId("mail-item").filter({ hasText: `To: ${USERS.other}` }).first()).toContainText("New message about 4-person tent");
     await context.clearCookies();
     await signInAs(page, USERS.other);
-    await page.getByRole("link", { name: "Messages" }).click();
+    await navLink(page, "Messages").click();
     const row = page.getByTestId("threads").getByRole("listitem").filter({ hasText: "4-person tent" });
     await expect(row).toContainText("asked by Ben");
     await row.getByRole("link", { name: "4-person tent" }).click();
