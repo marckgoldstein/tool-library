@@ -7,9 +7,9 @@
  * token only ever exists in the invitee's email.
  */
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { communities, invitations, memberships, users } from "@/db/schema";
+import { communities, invitations, items, memberships, users } from "@/db/schema";
 import { sendEmail, type OutgoingEmail } from "@/server/email/transport";
 import { DomainError, forbidden, notFound } from "../errors";
 import { GENERAL_AREA_MAX, NAME_MAX, cleanEmail, cleanGeneralArea, cleanName } from "../profiles/validation";
@@ -262,7 +262,7 @@ export async function resendInvitation(adminId: string, invitationId: string, ov
 // ---------- S3: join from the link ----------
 
 export type InviteLookup =
-  | { ok: true; invitation: Invitation; communityName: string }
+  | { ok: true; invitation: Invitation; communityName: string; memberCount: number; itemCount: number }
   | { ok: false; reason: "invalid" | "expired" };
 
 /** Read-only check for the join page. Used and unknown links look the same. */
@@ -275,7 +275,24 @@ export async function lookupInvite(token: string, now = new Date()): Promise<Inv
     .where(eq(invitations.tokenHash, hashToken(token)));
   if (!row || row.invitation.status !== "approved") return { ok: false, reason: "invalid" };
   if (!row.invitation.expiresAt || row.invitation.expiresAt <= now) return { ok: false, reason: "expired" };
-  return { ok: true, invitation: row.invitation, communityName: row.communityName };
+  // Something real about the group for the welcome: how many people, how many things to borrow.
+  const communityId = row.invitation.communityId;
+  const [members] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.communityId, communityId), isNull(memberships.removedAt), eq(users.status, "active")));
+  const [listed] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(items)
+    .where(and(eq(items.communityId, communityId), inArray(items.status, ["available", "on_loan"])));
+  return {
+    ok: true,
+    invitation: row.invitation,
+    communityName: row.communityName,
+    memberCount: members?.n ?? 0,
+    itemCount: listed?.n ?? 0,
+  };
 }
 
 export function cleanTimezone(value: string | null | undefined): string {

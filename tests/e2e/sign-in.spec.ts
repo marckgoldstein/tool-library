@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { latestLinkFor, signInAs, USERS } from "./helpers";
+import { latestLinkFor, openMore, signInAs, USERS } from "./helpers";
 
 test.describe("magic-link sign-in (T4, D7, D27)", () => {
   test("a member signs in from the emailed link and signs out", async ({ page }) => {
     await signInAs(page, USERS.owner);
     await expect(page.getByRole("heading", { name: "Welcome back, Olivia" })).toBeVisible();
-    await expect(page.getByText("Friends & Family Pilot")).toBeVisible();
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await expect(page.getByText("Friends & Family", { exact: true })).toBeVisible();
+    await (await openMore(page)).getByRole("button", { name: "Sign out" }).click();
     await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
   });
 

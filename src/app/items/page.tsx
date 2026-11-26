@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/auth";
+import { ItemCard } from "@/components/item-card";
 import { listCategories, searchItems } from "@/server/items/service";
-import { photoUrl } from "@/server/storage/photos";
 
 export const metadata: Metadata = { title: "Browse items" };
 export const dynamic = "force-dynamic";
@@ -52,40 +52,26 @@ export default async function BrowsePage({ searchParams }: { searchParams: Promi
             : "No items listed yet."
           : `${results.length} ${results.length === 1 ? "item" : "items"}${searching ? " found" : ""}`}
       </p>
-      {results.length === 0 && (
-        <p>
-          <Link className="button" href="/items/new">
-            List an item
-          </Link>
-        </p>
-      )}
-      <ul className="item-grid" data-testid="results">
-        {results.map((r) => (
-          <li key={r.id} className="item-card">
-            <Link href={`/items/${r.id}`}>
-              {r.photoKey ? (
-                // eslint-disable-next-line @next/next/no-img-element -- served by our /media route
-                <img src={photoUrl(r.photoKey)} alt="" loading="lazy" width={320} height={240} />
-              ) : (
-                <span className="no-photo" aria-hidden="true">
-                  No photo
-                </span>
-              )}
-              <span className="item-title">{r.title}</span>
+      {results.length === 0 &&
+        (searching ? (
+          <p className="actions">
+            <Link className="button" href="/items">
+              Clear search
             </Link>
             <span className="muted">
-              {r.categoryName}
-              {r.ownerArea ? ` · ${r.ownerArea}` : ""}
+              Can&apos;t find it? <Link href="/invite">Suggest someone</Link> who might lend it.
             </span>
-            <span className="tags">
-              {r.status === "on_loan" && (
-                <span className="status" data-status="on_loan">
-                  On loan
-                </span>
-              )}
-              {r.isOwn && <span className="status">Yours</span>}
-            </span>
-          </li>
+          </p>
+        ) : (
+          <p>
+            <Link className="button" href="/items/new">
+              List the first item
+            </Link>
+          </p>
+        ))}
+      <ul className="item-grid" data-testid="results">
+        {results.map((r) => (
+          <ItemCard key={r.id} item={r} />
         ))}
       </ul>
     </>

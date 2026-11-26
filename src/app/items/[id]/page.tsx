@@ -5,7 +5,9 @@ import { requireUser } from "@/auth";
 import { ConfirmAction } from "@/components/confirm-action";
 import { SubmitButton } from "@/components/submit-button";
 import { NOTICES } from "@/content/notices";
+import { loanLine } from "@/components/loan-line";
 import { DomainError } from "@/server/errors";
+import { activeMembership, cleanTimezone } from "@/server/invitations/service";
 import { getItem, type ItemView } from "@/server/items/service";
 import { photoUrl } from "@/server/storage/photos";
 import { itemStatusAction, type ItemResult } from "../actions";
@@ -54,6 +56,9 @@ export default async function ItemPage({
   const { result } = await searchParams;
   const flash = result && result in RESULT ? RESULT[result as ItemResult] : null;
   const category = item.parentCategoryName ? `${item.parentCategoryName} › ${item.categoryName}` : item.categoryName;
+  const firstName = item.owner.name.trim().split(/\s+/)[0] ?? item.owner.name;
+  const me = await activeMembership(user.id);
+  const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: cleanTimezone(me?.timezone) });
 
   return (
     <>
@@ -98,6 +103,31 @@ export default async function ItemPage({
           </>
         )}
       </dl>
+
+      {!item.isOwner && (
+        <section aria-labelledby="borrow-heading" className="borrow">
+          <h2 id="borrow-heading" className="visually-hidden">
+            Borrowing
+          </h2>
+          {item.status === "on_loan" && <p>It&apos;s out on loan right now. You can still ask {firstName} about it.</p>}
+          <form action={askOwnerAction}>
+            <input type="hidden" name="itemId" value={item.id} />
+            <SubmitButton pendingLabel="Opening…">Ask {firstName} about it</SubmitButton>
+          </form>
+          <p className="hint">You pick from a short list of set messages, and {firstName} gets an email.</p>
+          <div className="notices">
+            <details>
+              <summary>
+                <span>
+                  <strong>{lendingRisk.title}:</strong> {lendingRisk.summary}
+                </span>
+              </summary>
+              <p>{lendingRisk.body}</p>
+            </details>
+          </div>
+        </section>
+      )}
+
       <h2>About this item</h2>
       <p className="prewrap">{item.description}</p>
 
@@ -105,9 +135,15 @@ export default async function ItemPage({
         <section aria-labelledby="manage-heading">
           <h2 id="manage-heading">Manage your listing</h2>
           {item.locked ? (
-            <p className="notice warn">
-              This item has an approved or active loan, so it can&apos;t be edited, paused or delisted until the loan closes.
-            </p>
+            <div className="notice warn" data-testid="locked-notice">
+              {item.lockingLoan && (
+                <p>
+                  <strong>{loanLine(item.lockingLoan, fmt)}.</strong>{" "}
+                  <Link href={`/loans/${item.lockingLoan.id}`}>See the loan</Link>
+                </p>
+              )}
+              <p>While it&apos;s lent out, it can&apos;t be edited, paused or delisted. That opens up again once the loan closes.</p>
+            </div>
           ) : (
             <div className="actions">
               <Link className="button" href={`/items/${item.id}/edit`}>
@@ -126,6 +162,8 @@ export default async function ItemPage({
                   label="Delist…"
                   title={`Delist ${item.title}?`}
                   confirmLabel="Delist item"
+                  pendingLabel="Delisting…"
+                  cancelLabel="Keep it listed"
                   action={itemStatusAction}
                   fields={{ itemId: item.id, intent: "delist" }}
                   danger
@@ -137,20 +175,7 @@ export default async function ItemPage({
             </div>
           )}
         </section>
-      ) : (
-        <section aria-labelledby="borrow-heading">
-          <h2 id="borrow-heading">Borrowing</h2>
-          {item.status === "on_loan" && <p>It&apos;s out on loan right now.</p>}
-          <p className="notice">
-            <strong>{lendingRisk.title}:</strong> {lendingRisk.body}
-          </p>
-          <form action={askOwnerAction}>
-            <input type="hidden" name="itemId" value={item.id} />
-            <SubmitButton pendingLabel="Opening…">Ask the owner</SubmitButton>
-          </form>
-          <p className="hint">Questions use a short list of set messages. Requesting dates arrives in the next milestone.</p>
-        </section>
-      )}
+      ) : null}
     </>
   );
 }

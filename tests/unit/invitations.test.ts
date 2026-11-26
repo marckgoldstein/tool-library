@@ -119,7 +119,8 @@ describe("S3: the invitee joins from the link", () => {
 
   it("creates the member with notices accepted, records who suggested them, and uses up the link", async () => {
     const s = await approvedInvite();
-    expect(await lookupInvite(s.token)).toMatchObject({ ok: true });
+    // The join page's welcome: real numbers about the group (2 members, no items yet).
+    expect(await lookupInvite(s.token)).toMatchObject({ ok: true, memberCount: 2, itemCount: 0 });
     const user = await acceptInvitation(s.token, joinInput, deps);
     expect(user).toMatchObject({ email: "sam@example.test", name: "Sam", generalArea: "Maplewood", timezone: "America/Chicago", role: "member", status: "active" });
     expect(user.termsAcceptedAt).toBeInstanceOf(Date);

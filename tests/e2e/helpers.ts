@@ -18,6 +18,18 @@ export async function signInAs(page: Page, email: string) {
   await page.goto(link);
 }
 
+/** The header's More menu (native popover): open it, then return a locator inside it. */
+export async function openMore(page: Page) {
+  await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: /^More/ }).click();
+  const menu = page.locator("#more-menu");
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+/** A link in the main navigation (not a same-named link on the page). */
+export const navLink = (page: Page, name: string) =>
+  page.getByRole("navigation", { name: "Main" }).getByRole("link", { name, exact: true });
+
 /** A 64×48 PNG made in memory, for photo uploads. */
 export async function testPhoto(name = "photo.png") {
   const sharp = (await import("sharp")).default;

@@ -32,7 +32,7 @@ export default async function EditItemPage({ params }: { params: Promise<{ id: s
       <>
         <h1>Edit {item.title}</h1>
         <p className="notice warn">
-          This item has an approved or active loan, so it can&apos;t be edited, paused or delisted until the loan closes.
+          While it&apos;s lent out, it can&apos;t be edited, paused or delisted. That opens up again once the loan closes.
         </p>
         <p>
           <Link href={`/items/${item.id}`}>Back to the item</Link>

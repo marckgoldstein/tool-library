@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { db, pool } from "@/db";
 import { categories, itemPhotos, memberships } from "@/db/schema";
-import { createItem, getItem, searchItems, setItemStatus, updateItem } from "@/server/items/service";
+import { createItem, getItem, listOwnItems, searchItems, setItemStatus, updateItem } from "@/server/items/service";
 import { approveLoan, confirmReturn, markPickedUp, markReturned, requestLoan } from "@/server/loans/service";
 import { conversationFor, hours, join, makeCommunity, makeUser, resetDb, scenario, shareContact } from "../support/factories";
 
@@ -93,6 +93,16 @@ describe("S8: edit, pause, delist", () => {
     await markReturned(s.borrower.id, loan.id, quiet);
     await confirmReturn(s.owner.id, loan.id, "fine", null, quiet);
     await expect(setItemStatus(s.owner.id, s.item.id, "pause")).resolves.toMatchObject({ status: "paused" });
+  });
+
+  it("tells the owner who has a locked item and until when; nobody else", async () => {
+    const s = await scenario();
+    const loan = await requestLoan({ borrowerId: s.borrower.id, itemId: s.item.id, startAt: hours(1), endAt: hours(5) }, quiet);
+    await approveLoan(s.owner.id, loan.id, quiet);
+    const [mine] = await listOwnItems(s.owner.id);
+    expect(mine!.lockingLoan).toMatchObject({ id: loan.id, status: "approved", borrowerName: "Ben Borrower" });
+    expect((await getItem(s.owner.id, s.item.id)).lockingLoan).toMatchObject({ id: loan.id });
+    expect((await getItem(s.other.id, s.item.id)).lockingLoan).toBeNull();
   });
 });
 

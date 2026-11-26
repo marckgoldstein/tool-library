@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/auth";
 import { ConfirmAction } from "@/components/confirm-action";
-import { SubmitButton } from "@/components/submit-button";
 import { activeMembership, cleanTimezone } from "@/server/invitations/service";
 import { listMembersForAdmin } from "@/server/members/service";
 import { memberAction, type MemberResult } from "./actions";
@@ -61,33 +60,51 @@ export default async function AdminMembersPage({ searchParams }: { searchParams:
                 <Link href={`/members/${m.id}`}>{name}</Link>
                 {isMe && <span className="muted"> (you)</span>} <span className="muted">{m.email}</span>
               </span>
-              {m.role === "admin" && <span className="status" data-status="approved">Admin</span>}
+              {m.role === "admin" && <span className="role">Admin</span>}
               <time className="muted" dateTime={m.joinedAt.toISOString()}>
                 Joined {dateFmt.format(m.joinedAt)}
               </time>
               <span className="actions">
                 {m.role === "admin" ? (
                   adminCount > 1 && (
-                    <form action={memberAction}>
-                      <input type="hidden" name="memberId" value={m.id} />
-                      <SubmitButton name="intent" value="demote" className="secondary">
-                        Remove admin role
-                      </SubmitButton>
-                    </form>
+                    <ConfirmAction
+                      label="Remove admin role…"
+                      title={isMe ? "Step down as admin?" : `Make ${name} a member again?`}
+                      confirmLabel={isMe ? "Step down" : "Remove admin role"}
+                      pendingLabel="Updating…"
+                      cancelLabel={isMe ? "Stay admin" : `Keep ${name} as admin`}
+                      action={memberAction}
+                      fields={{ memberId: m.id, intent: "demote" }}
+                      variant="quiet"
+                    >
+                      <p>
+                        {isMe ? "You" : "They"}&apos;ll no longer see member suggestions or this page, or get problem
+                        reports from loans.
+                      </p>
+                    </ConfirmAction>
                   )
                 ) : (
-                  <form action={memberAction}>
-                    <input type="hidden" name="memberId" value={m.id} />
-                    <SubmitButton name="intent" value="promote" className="secondary">
-                      Make admin
-                    </SubmitButton>
-                  </form>
+                  <ConfirmAction
+                    label="Make admin…"
+                    title={`Make ${name} an admin?`}
+                    confirmLabel={`Make ${name} an admin`}
+                    pendingLabel="Updating…"
+                    cancelLabel={`Keep ${name} as a member`}
+                    action={memberAction}
+                    fields={{ memberId: m.id, intent: "promote" }}
+                    variant="quiet"
+                  >
+                    <p>Admins see every member&apos;s email address, who suggested each new member, and this page.</p>
+                    <p>They approve new members, can remove people, and get problem reports when a loan goes wrong.</p>
+                  </ConfirmAction>
                 )}
                 {!isMe && !(m.role === "admin" && adminCount <= 1) && (
                   <ConfirmAction
                     label="Remove…"
                     title={`Remove ${name} from the group?`}
                     confirmLabel={`Remove ${name}`}
+                    pendingLabel="Removing…"
+                    cancelLabel={`Keep ${name}`}
                     action={memberAction}
                     fields={{ memberId: m.id, intent: "remove" }}
                     danger

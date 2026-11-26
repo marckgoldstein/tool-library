@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
+import { BrowseLink, MoreMenuLinks, NavLink, SignInLink, YourItemsLink } from "@/components/site-nav";
 import { pendingCount } from "@/server/invitations/service";
 import "./globals.css";
 
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
   description: "Borrow and lend tools and gear within your group.",
 };
 
+// Matches --paper in globals.css, so the browser chrome blends with the page.
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fbfaf7" },
@@ -18,47 +20,87 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-  const pending = session?.user?.role === "admin" ? await pendingCount(session.user.id) : 0;
+  const isAdmin = session?.user?.role === "admin";
+  const pending = isAdmin ? await pendingCount(session!.user.id) : 0;
   return (
     <html lang="en">
       <body>
+        <a className="skip-link" href="#main">
+          Skip to content
+        </a>
         <header className="site-header">
           <Link className="brand" href="/">
             Tool Library
           </Link>
           <nav aria-label="Main">
             {session?.user ? (
-              <>
-                <Link href="/items">Browse</Link>
-                <Link href="/items/mine">Your items</Link>
-                <Link href="/threads">Messages</Link>
-                <Link href="/invite">Suggest someone</Link>
-                {session.user.role === "admin" && (
-                  <>
-                    <Link href="/admin/invitations">
-                      Member suggestions{pending > 0 ? <span className="count"> {pending}</span> : null}
-                    </Link>
-                    <Link href="/admin/members">Members</Link>
-                  </>
-                )}
-                <Link href="/profile">Your profile</Link>
-                <form
-                  action={async () => {
-                    "use server";
-                    await signOut({ redirectTo: "/" });
-                  }}
-                >
-                  <button type="submit" className="secondary">
-                    Sign out
+              <ul className="nav-list">
+                <li>
+                  <BrowseLink />
+                </li>
+                <li>
+                  <YourItemsLink />
+                </li>
+                <li>
+                  <NavLink href="/threads">Messages</NavLink>
+                </li>
+                <li>
+                  <NavLink href="/profile">Profile</NavLink>
+                </li>
+                <li>
+                  {/* Native popover (D33): light dismiss and Escape come built in. */}
+                  <button type="button" className="nav-more-button" popoverTarget="more-menu" aria-label={pending > 0 ? `More, ${pending} suggestions waiting` : undefined}>
+                    More{pending > 0 ? <span className="count">{pending}</span> : null}
                   </button>
-                </form>
-              </>
+                  <div id="more-menu" popover="auto" className="nav-more">
+                    <MoreMenuLinks>
+                      <ul>
+                        <li>
+                          <NavLink href="/invite">Suggest someone</NavLink>
+                        </li>
+                        {isAdmin && (
+                          <>
+                            <li>
+                              <NavLink href="/admin/invitations">
+                                Member suggestions{pending > 0 ? <span className="count">{pending}</span> : null}
+                              </NavLink>
+                            </li>
+                            <li>
+                              <NavLink href="/admin/members">Members</NavLink>
+                            </li>
+                          </>
+                        )}
+                        <li>
+                          <NavLink href="/notices">Notices</NavLink>
+                        </li>
+                      </ul>
+                      <hr />
+                      <form
+                        action={async () => {
+                          "use server";
+                          await signOut({ redirectTo: "/" });
+                        }}
+                      >
+                        <button type="submit" className="link">
+                          Sign out
+                        </button>
+                      </form>
+                    </MoreMenuLinks>
+                  </div>
+                </li>
+              </ul>
             ) : (
-              <Link href="/sign-in">Sign in</Link>
+              <ul className="nav-list">
+                <li>
+                  <SignInLink />
+                </li>
+              </ul>
             )}
           </nav>
         </header>
-        <main id="main">{children}</main>
+        <main id="main" tabIndex={-1}>
+          {children}
+        </main>
         <footer className="site-footer">
           <p>
             Members lend and borrow at their own risk. <Link href="/notices">Notices and how we use your data</Link>

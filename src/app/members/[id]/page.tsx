@@ -3,8 +3,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/auth";
 import { Avatar } from "@/components/avatar";
+import { ItemCard } from "@/components/item-card";
 import { DomainError } from "@/server/errors";
 import { activeMembership, cleanTimezone } from "@/server/invitations/service";
+import { searchItems } from "@/server/items/service";
 import { getPublicProfile, type PublicProfile } from "@/server/profiles/service";
 
 export const metadata: Metadata = { title: "Member" };
@@ -25,7 +27,8 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
     if (e instanceof DomainError) notFound();
     throw e;
   }
-  const viewer = await activeMembership(user.id);
+  const [viewer, lends] = await Promise.all([activeMembership(user.id), searchItems(user.id, { ownerId: profile.id })]);
+  const firstName = profile.name.trim().split(/\s+/)[0] ?? profile.name;
   const joined = new Intl.DateTimeFormat("en-US", {
     month: "long",
     year: "numeric",
@@ -56,6 +59,25 @@ export default async function MemberProfilePage({ params }: { params: Promise<{ 
         <p>
           This is how other members see you. <Link href="/profile">Edit your profile</Link>
         </p>
+      )}
+
+      <h2 id="lends-heading">{profile.isSelf ? "What you lend" : `What ${firstName} lends`}</h2>
+      {lends.length === 0 ? (
+        <p data-testid="lends-empty">
+          {profile.isSelf ? (
+            <>
+              Nothing listed yet. <Link href="/items/new">List an item</Link>
+            </>
+          ) : (
+            `${firstName} hasn't listed anything yet.`
+          )}
+        </p>
+      ) : (
+        <ul className="item-grid" aria-labelledby="lends-heading" data-testid="lends">
+          {lends.map((item) => (
+            <ItemCard key={item.id} item={item} showOwner={false} />
+          ))}
+        </ul>
       )}
     </>
   );

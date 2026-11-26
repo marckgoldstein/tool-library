@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { SubmitButton } from "@/components/submit-button";
+import { useKeptFormAction } from "@/components/use-kept-form";
 import type { ItemFields } from "@/server/items/service";
 import type { ItemFormState } from "./actions";
 
@@ -12,6 +13,12 @@ export interface CategoryOption {
 }
 
 const initial: ItemFormState = { status: "idle" };
+
+/** ["Weapons", "Vehicles", "Consumables"] → "Weapons, vehicles and consumables". */
+function sentenceList(words: string[]) {
+  const lower = words.map((w, i) => (i === 0 ? w : w.charAt(0).toLowerCase() + w.slice(1)));
+  return lower.length < 2 ? lower.join("") : `${lower.slice(0, -1).join(", ")} and ${lower.at(-1)}`;
+}
 
 /** The list (S7) and edit (S8) form. Existing photos come rendered by the server page, with their URLs. */
 export function ItemForm({
@@ -33,17 +40,17 @@ export function ItemForm({
   existingPhotos?: { id: string; url: string }[];
   submitLabel: string;
 }) {
-  const [state, formAction] = useActionState(action, initial);
+  const { state, formAction, onSubmit, pending } = useKeptFormAction(action, initial);
   const errorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     if (state.status === "error") errorRef.current?.focus();
   }, [state]);
-  const v = state.status === "error" ? state.values : defaults;
-  const key = state.status === "error" ? JSON.stringify(state.values) : "initial";
+  // Fields keep what was typed after an error (no form reset), so defaults only seed the first render.
+  const v = defaults;
   const isEdit = existingPhotos.length > 0;
 
   return (
-    <form className="stack wide" action={formAction} aria-labelledby="item-heading" key={key}>
+    <form className="stack wide" action={formAction} onSubmit={onSubmit} aria-labelledby="item-heading">
       {state.status === "error" && (
         <p ref={errorRef} tabIndex={-1} role="alert" className="error-text" data-testid="item-error">
           {state.message}
@@ -91,11 +98,22 @@ export function ItemForm({
         <div className="choices">
           {conditions.map((c, i) => (
             <div className="field check" key={c}>
-              <input id={`condition-${i}`} type="radio" name="condition" value={c} required defaultChecked={v?.condition === c} />
+              <input
+                id={`condition-${i}`}
+                type="radio"
+                name="condition"
+                value={c}
+                required
+                defaultChecked={v?.condition === c}
+                data-error="condition-error"
+              />
               <label htmlFor={`condition-${i}`}>{c}</label>
             </div>
           ))}
         </div>
+        <p id="condition-error" className="error-msg">
+          Choose the item&apos;s condition.
+        </p>
       </fieldset>
       <div className="field">
         <label htmlFor="handoffNotes">
@@ -142,9 +160,11 @@ export function ItemForm({
 
       <section className="notice warn" aria-labelledby="excluded-heading">
         <h2 id="excluded-heading" className="notice-heading">Items that can&apos;t be listed</h2>
-        <p>{exclusions.join(", ")}. Anything else legal is fine.</p>
+        <p>{sentenceList(exclusions)}. Anything else legal is fine.</p>
       </section>
-      <SubmitButton pendingLabel="Saving…">{submitLabel}</SubmitButton>
+      <SubmitButton pendingLabel="Saving…" pending={pending}>
+        {submitLabel}
+      </SubmitButton>
     </form>
   );
 }
