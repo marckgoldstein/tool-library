@@ -10,6 +10,7 @@ import { DomainError } from "@/server/errors";
 import { activeMembership, cleanTimezone } from "@/server/invitations/service";
 import { getLoanView, type LoanView } from "@/server/loans/queries";
 import { adminCloseAction, loanAction, type LoanResult } from "../actions";
+import { OutcomeFields } from "../outcome-fields";
 
 export const metadata: Metadata = { title: "Loan" };
 export const dynamic = "force-dynamic";
@@ -93,31 +94,24 @@ function Actions({ loan }: { loan: LoanView }) {
             fields={fields}
             danger
           >
-            <p>
-              {status === "requested" || status === "approved"
-                ? "It hasn't been picked up, so it's cancelled whatever you choose. "
-                : null}
-              The other member is emailed, and the history records you as the one who closed it.
-            </p>
-            <fieldset>
-              <legend>Outcome</legend>
-              <div className="field check">
-                <input id="a-fine" type="radio" name="outcome" value="fine" defaultChecked />
-                <label htmlFor="a-fine">Came back fine</label>
-              </div>
-              <div className="field check">
-                <input id="a-damaged" type="radio" name="outcome" value="damaged" />
-                <label htmlFor="a-damaged">Came back damaged</label>
-              </div>
-              <div className="field check">
-                <input id="a-missing" type="radio" name="outcome" value="not_returned" />
-                <label htmlFor="a-missing">Didn&apos;t come back</label>
-              </div>
-            </fieldset>
-            <div className="field">
-              <label htmlFor="admin-note">Note</label>
-              <textarea id="admin-note" name="note" rows={3} maxLength={2000} required />
-            </div>
+            {status === "requested" || status === "approved" ? (
+              <>
+                <p>
+                  It hasn&apos;t been picked up, so the loan is cancelled. The other member is emailed, and the history
+                  records you as the one who closed it.
+                </p>
+                <input type="hidden" name="outcome" value="fine" />
+                <div className="field">
+                  <label htmlFor="admin-note">Note</label>
+                  <textarea id="admin-note" name="note" rows={3} maxLength={2000} required />
+                </div>
+              </>
+            ) : (
+              <>
+                <p>The other member is emailed, and the history records you as the one who closed it.</p>
+                <OutcomeFields idPrefix="admin" noteAlwaysRequired />
+              </>
+            )}
           </ConfirmAction>
         </div>
       );
@@ -250,39 +244,58 @@ function Actions({ loan }: { loan: LoanView }) {
           cancelLabel={returned ? "Not yet" : "Keep waiting"}
           action={loanAction}
           fields={returned ? { ...fields, intent: "close" } : { ...fields, intent: "close", outcome: "not_returned" }}
+          // Before the due time this is a rare step, so it stays a quiet link-style button.
+          variant={returned || status === "overdue" ? "secondary" : "quiet"}
           danger={!returned}
         >
           {returned ? (
-            <fieldset>
-              <legend>Outcome</legend>
-              <div className="field check">
-                <input id="outcome-fine" type="radio" name="outcome" value="fine" defaultChecked />
-                <label htmlFor="outcome-fine">Came back fine</label>
-              </div>
-              <div className="field check">
-                <input id="outcome-damaged" type="radio" name="outcome" value="damaged" />
-                <label htmlFor="outcome-damaged">Came back damaged</label>
-              </div>
-              <div className="field check">
-                <input id="outcome-missing" type="radio" name="outcome" value="not_returned" />
-                <label htmlFor="outcome-missing">Didn&apos;t come back</label>
-              </div>
-            </fieldset>
+            <OutcomeFields idPrefix="outcome" />
           ) : (
-            <p>The item is delisted and the admin is emailed to help sort it out. {otherFirst} is told too.</p>
+            <>
+              <p>The item is delisted and the admin is emailed to help sort it out. {otherFirst} is told too.</p>
+              <div className="field">
+                <label htmlFor="note">
+                  Note <span className="hint">(required: say what happened)</span>
+                </label>
+                <textarea id="note" name="note" rows={3} maxLength={2000} required />
+              </div>
+            </>
           )}
-          <div className="field">
-            <label htmlFor="note">
-              Note {returned ? <span className="hint">(needed if it was damaged or didn&apos;t come back)</span> : null}
-            </label>
-            <textarea id="note" name="note" rows={3} maxLength={2000} required={!returned} />
-          </div>
         </ConfirmAction>
       </div>
     );
   }
 
   return null;
+}
+
+/** One line that says whose move it is and what happens next (Impeccable review: visibility of status). */
+function nextStep(loan: LoanView, due: string): string | null {
+  const owner = firstName(loan.owner.name);
+  const borrower = firstName(loan.borrower.name);
+  const { role, status } = loan;
+  if (role === "admin") return null;
+  const mine = role === "owner";
+  switch (status) {
+    case "requested":
+      return mine ? `${borrower} would like to borrow it. Approve or decline below.` : `Waiting for ${owner} to approve or decline. You'll get an email.`;
+    case "approved":
+      return mine
+        ? `Arrange the handoff with ${borrower} in Messages, then mark it picked up when you hand it over.`
+        : `Arrange the handoff with ${owner} in Messages. ${owner} marks it picked up when you collect it.`;
+    case "active":
+      return mine
+        ? `With ${borrower} until ${due}. ${borrower} marks it returned, then you check it over.`
+        : `Due back ${due}. Once you've given it back, mark it returned.`;
+    case "overdue":
+      return mine
+        ? `${borrower} was due to bring it back ${due}. Message ${borrower} first. If it isn't coming back, close the loan below.`
+        : `This was due back ${due}. Return it, or message ${owner} to sort out a new time.`;
+    case "returned":
+      return mine ? `${borrower} says it's back. Check it over, then confirm how it came back.` : `${owner} will check it over and close the loan.`;
+    default:
+      return null;
+  }
 }
 
 /** The loan, from emails and the Loans page (M5: S12–S20). Actions depend on who's looking and where the loan stands. */
@@ -308,7 +321,8 @@ export default async function LoanPage({
   const me = await activeMembership(session.user.id);
   const timeZone = cleanTimezone(me?.timezone);
   const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone });
-  const roleLine = loan.role === "owner" ? "You're lending this" : loan.role === "borrower" ? "You're borrowing this" : "Admin view";
+  const next = nextStep(loan, fmt.format(loan.endAt));
+  const roleLine =loan.role === "owner" ? "You're lending this" : loan.role === "borrower" ? "You're borrowing this" : "Admin view";
 
   return (
     <>
@@ -327,6 +341,11 @@ export default async function LoanPage({
         </span>{" "}
         · {roleLine}
       </p>
+      {next && (
+        <p className="next-step" data-testid="loan-next">
+          {next}
+        </p>
+      )}
       <dl className="panel details">
         <dt>Lender</dt>
         <dd>

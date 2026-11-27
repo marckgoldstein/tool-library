@@ -30,6 +30,7 @@ test.describe("M5 loan loop (S12–S20)", () => {
     await signInAs(page, USERS.borrower);
     await openWasherLoanAsBen(page, info.project.name === "mobile" ? 20 : 12);
     await expect(page.getByTestId("loan-status")).toHaveText("Requested");
+    await expect(page.getByTestId("loan-next")).toHaveText("Waiting for Olivia to approve or decline. You'll get an email.");
     await expect(page.getByRole("button", { name: "Withdraw request…" })).toBeVisible(); // S13 is offered
     const loanUrl = page.url().split("?")[0]!;
 
@@ -74,9 +75,15 @@ test.describe("M5 loan loop (S12–S20)", () => {
     await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: /^Loans/ }).click();
     await expect(page.getByTestId("loans-todo")).toContainText("Check it over and confirm");
     await page.goto(loanUrl);
+    await expect(page.getByTestId("loan-next")).toContainText("Check it over, then confirm how it came back.");
     await page.getByRole("button", { name: "Confirm the return…" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByLabel("Came back fine")).toBeChecked();
+    // A damaged outcome needs a note before the dialog sends (Impeccable review).
+    await expect(dialog.getByRole("textbox")).not.toHaveAttribute("required");
+    await dialog.getByLabel("Came back damaged").check();
+    await expect(dialog.getByRole("textbox")).toHaveAttribute("required");
+    await dialog.getByLabel("Came back fine").check();
     await dialog.getByRole("button", { name: "Close the loan" }).click();
     await expect(page.getByTestId("loan-status")).toHaveText("Closed");
     await expect(page.getByTestId("loan-outcome")).toHaveText("Came back fine");

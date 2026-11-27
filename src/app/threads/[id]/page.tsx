@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/auth";
 import { ConfirmAction } from "@/components/confirm-action";
 import { SubmitButton } from "@/components/submit-button";
+import { MAIN_CATEGORY } from "@/content/canned-messages";
 import { DomainError } from "@/server/errors";
 import { activeMembership, cleanTimezone } from "@/server/invitations/service";
 import { getOwnContacts } from "@/server/profiles/service";
@@ -54,6 +55,7 @@ export default async function ThreadPage({
   const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: cleanTimezone(me?.timezone) });
   // The sender's own saved values, shown only to them in the confirm step.
   const own = thread.savedContactTypes.length > 0 ? await getOwnContacts(user.id) : { phone: null, email: null };
+  const mainKey = MAIN_CATEGORY[thread.role][thread.stage];
 
   return (
     <>
@@ -110,19 +112,31 @@ export default async function ThreadPage({
         <section aria-labelledby="reply-heading" className="composer">
           <h2 id="reply-heading">Send a message</h2>
           <p className="hint">Messages are picked from a list, so everyone stays clear and kind. {thread.other.name} gets an email.</p>
-          {thread.categories.map((c) => (
-            <form key={c.key} action={sendMessageAction} className="canned" aria-labelledby={`cat-${c.key}`}>
-              <input type="hidden" name="threadId" value={thread.id} />
-              <h3 id={`cat-${c.key}`}>{c.label}</h3>
-              <div className="canned-options">
+          {thread.categories.map((c) => {
+            const form = (
+              <form action={sendMessageAction} className="canned-options" aria-label={c.label}>
+                <input type="hidden" name="threadId" value={thread.id} />
                 {c.messages.map((msg) => (
                   <SubmitButton key={msg.key} name="templateKey" value={msg.key} className="secondary canned-option">
                     {msg.text}
                   </SubmitButton>
                 ))}
+              </form>
+            );
+            // The stage's main group is open; the rest fold away so a stray tap can't send them (each one emails).
+            const main = c.key === mainKey || thread.categories.length === 1;
+            return main ? (
+              <div key={c.key} className="canned">
+                <h3>{c.label}</h3>
+                {form}
               </div>
-            </form>
-          ))}
+            ) : (
+              <details key={c.key} className="canned more">
+                <summary>{c.label}</summary>
+                {form}
+              </details>
+            );
+          })}
 
           <section aria-labelledby="contact-heading" className="share">
             <h3 id="contact-heading">Send contact details</h3>
@@ -156,7 +170,7 @@ export default async function ThreadPage({
                 })}
               </div>
             )}
-            {!thread.hasContactShare && (
+            {!thread.hasContactShare && (thread.stage === "before_pickup" || thread.stage === "approved") && (
               <p className="hint">Pickup needs at least one of you to send contact details in this thread.</p>
             )}
           </section>

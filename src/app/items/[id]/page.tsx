@@ -119,7 +119,10 @@ export default async function ItemPage({
           {item.status === "on_loan" && <p>It&apos;s out on loan right now. You can still ask {firstName} about it.</p>}
           <form action={askOwnerAction}>
             <input type="hidden" name="itemId" value={item.id} />
-            <SubmitButton pendingLabel="Opening…">Ask {firstName} about it</SubmitButton>
+            {/* Secondary: requesting dates is the main action on this page, and only one button should lead. */}
+            <SubmitButton pendingLabel="Opening…" className="secondary">
+              Ask {firstName} about it
+            </SubmitButton>
           </form>
           <p className="hint">You pick from a short list of set messages, and {firstName} gets an email.</p>
           {myLoan ? (
