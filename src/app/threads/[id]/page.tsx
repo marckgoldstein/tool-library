@@ -67,6 +67,12 @@ export default async function ThreadPage({
       </h1>
       <p className="muted" data-testid="thread-stage">
         {STAGE_LABEL[thread.stage]}
+        {thread.loanId && (
+          <>
+            {" · "}
+            <Link href={`/loans/${thread.loanId}`}>See the loan</Link>
+          </>
+        )}
       </p>
       {flash && (
         <p className={flash.ok ? "notice success" : "error-text"} role={flash.ok ? "status" : "alert"} data-testid="thread-result">

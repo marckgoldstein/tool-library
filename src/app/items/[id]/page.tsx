@@ -12,6 +12,9 @@ import { getItem, type ItemView } from "@/server/items/service";
 import { photoUrl } from "@/server/storage/photos";
 import { itemStatusAction, type ItemResult } from "../actions";
 import { askOwnerAction } from "../../threads/actions";
+import { RequestForm } from "../../loans/request-form";
+import { openLoanForItem } from "@/server/loans/queries";
+import { alignedLocalMin } from "@/lib/zoned-time";
 
 export const metadata: Metadata = { title: "Item" };
 export const dynamic = "force-dynamic";
@@ -35,7 +38,7 @@ const STATUS_LABEL: Record<ItemView["status"], string> = {
 
 const lendingRisk = NOTICES.find((n) => n.id === "lending-risk")!;
 
-/** An item's page, from search (S9). Owners manage it here (S8). Requests arrive with the loan loop (M5). */
+/** An item's page, from search (S9). Owners manage it here (S8); members ask about it (S10) and request dates (S12). */
 export default async function ItemPage({
   params,
   searchParams,
@@ -58,7 +61,9 @@ export default async function ItemPage({
   const category = item.parentCategoryName ? `${item.parentCategoryName} › ${item.categoryName}` : item.categoryName;
   const firstName = item.owner.name.trim().split(/\s+/)[0] ?? item.owner.name;
   const me = await activeMembership(user.id);
-  const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: cleanTimezone(me?.timezone) });
+  const timeZone = cleanTimezone(me?.timezone);
+  const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone });
+  const myLoan = item.isOwner ? null : await openLoanForItem(user.id, item.id);
 
   return (
     <>
@@ -115,6 +120,19 @@ export default async function ItemPage({
             <SubmitButton pendingLabel="Opening…">Ask {firstName} about it</SubmitButton>
           </form>
           <p className="hint">You pick from a short list of set messages, and {firstName} gets an email.</p>
+          {myLoan ? (
+            <p className="notice" data-testid="my-request">
+              You have a {myLoan.status === "requested" ? "request" : "loan"} for {fmt.format(myLoan.startAt)} to{" "}
+              {fmt.format(myLoan.endAt)}. <Link href={`/loans/${myLoan.id}`}>See where it stands</Link>
+            </p>
+          ) : (
+            <RequestForm
+              itemId={item.id}
+              ownerFirstName={firstName}
+              minLocal={alignedLocalMin(new Date(), timeZone)}
+              timeZoneLabel={timeZone.replaceAll("_", " ")}
+            />
+          )}
           <div className="notices">
             <details>
               <summary>
