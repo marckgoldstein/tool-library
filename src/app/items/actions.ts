@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/auth";
 import { DomainError } from "@/server/errors";
-import { createItem, setItemStatus, updateItem, type ItemFields, type OwnerStatusAction } from "@/server/items/service";
+import { adminDelistItem, createItem, setItemStatus, updateItem, type ItemFields, type OwnerStatusAction } from "@/server/items/service";
 import { PhotoError, processPhoto, savePhoto } from "@/server/storage/photos";
 
 /** Photos per submit; the server action body limit (next.config.ts) is sized for this many at 10 MB. */
@@ -69,7 +69,23 @@ export async function updateItemAction(itemId: string, _prev: ItemFormState, for
   redirect(`/items/${itemId}?result=saved`);
 }
 
-export type ItemResult = "listed" | "saved" | "paused" | "resumed" | "delisted" | "locked" | "failed";
+export type ItemResult = "listed" | "saved" | "paused" | "resumed" | "delisted" | "admin_delisted" | "needs_note" | "locked" | "failed";
+
+/** S24: the admin delists any item, with a note emailed to the owner. */
+export async function adminDelistAction(formData: FormData) {
+  const user = await requireUser();
+  if (!user) redirect("/sign-in");
+  const itemId = String(formData.get("itemId") ?? "");
+  let result: ItemResult = "admin_delisted";
+  try {
+    await adminDelistItem(user.id, itemId, String(formData.get("note") ?? ""));
+  } catch (e) {
+    if (!(e instanceof DomainError)) throw e;
+    result = e.code === "listing_locked" ? "locked" : e.code === "invalid_input" ? "needs_note" : "failed";
+  }
+  revalidatePath("/items");
+  redirect(result === "admin_delisted" ? "/items?result=admin_delisted" : `/items/${itemId}?result=${result}`);
+}
 
 export async function itemStatusAction(formData: FormData) {
   const user = await requireUser();

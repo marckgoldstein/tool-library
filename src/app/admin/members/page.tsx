@@ -132,6 +132,18 @@ export default async function AdminMembersPage({ searchParams }: { searchParams:
                   Removed {dateFmt.format(m.removedAt)}
                 </time>
               )}
+              {m.openLoans.length > 0 && (
+                <span className="owned-main" data-testid="removed-open-loans">
+                  <strong className="todo">
+                    {m.openLoans.length === 1 ? "1 open loan to close" : `${m.openLoans.length} open loans to close`}
+                  </strong>
+                  {m.openLoans.map((l) => (
+                    <Link key={l.id} href={`/loans/${l.id}`}>
+                      {l.itemTitle}
+                    </Link>
+                  ))}
+                </span>
+              )}
             </li>
           ))}
         </ul>

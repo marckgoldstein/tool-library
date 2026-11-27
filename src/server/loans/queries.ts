@@ -3,10 +3,10 @@
  * service.ts (S22). Only the two parties see a loan; admins see it too, as on
  * the loan page from emails.
  */
-import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { contactShares, items, loanEvents, loans, users } from "@/db/schema";
+import { contactShares, items, loanEvents, loans, memberships, users } from "@/db/schema";
 import { displayStatus, type DisplayStatus } from "./rules";
 import { notFound } from "../errors";
 
@@ -50,7 +50,16 @@ export async function getLoanView(viewerId: string, viewerRole: "member" | "admi
     .where(eq(loans.id, loanId));
   if (!row) throw notFound("Loan");
   const { loan } = row;
-  const role = loan.borrowerId === viewerId ? "borrower" : loan.ownerId === viewerId ? "owner" : viewerRole === "admin" ? "admin" : null;
+  let role: LoanView["role"] | null = loan.borrowerId === viewerId ? "borrower" : loan.ownerId === viewerId ? "owner" : null;
+  if (!role && viewerRole === "admin") {
+    // T14: an admin sees loans in their own group only (every query is group-scoped).
+    const [scope] = await db
+      .select({ ok: memberships.userId })
+      .from(memberships)
+      .innerJoin(items, eq(items.communityId, memberships.communityId))
+      .where(and(eq(memberships.userId, viewerId), isNull(memberships.removedAt), eq(items.id, loan.itemId)));
+    if (scope) role = "admin";
+  }
   // Not found and not allowed look the same, so loan ids can't be probed.
   if (!role) throw notFound("Loan");
   const [share] = await db

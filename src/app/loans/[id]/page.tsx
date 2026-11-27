@@ -9,7 +9,7 @@ import { NOTICES } from "@/content/notices";
 import { DomainError } from "@/server/errors";
 import { activeMembership, cleanTimezone } from "@/server/invitations/service";
 import { getLoanView, type LoanView } from "@/server/loans/queries";
-import { loanAction, type LoanResult } from "../actions";
+import { adminCloseAction, loanAction, type LoanResult } from "../actions";
 
 export const metadata: Metadata = { title: "Loan" };
 export const dynamic = "force-dynamic";
@@ -76,7 +76,54 @@ function Actions({ loan }: { loan: LoanView }) {
   const fields = { loanId: loan.id };
   const { role, status } = loan;
 
-  if (role === "admin") return <p className="muted">Only the two members in this loan can act on it.</p>;
+  if (role === "admin") {
+    const open = ["requested", "approved", "active", "overdue", "returned"].includes(status);
+    const removed = !loan.borrower.active || !loan.owner.active;
+    // S23 (R1): with a member removed, nobody else can finish the loan, so the admin can.
+    if (open && removed) {
+      return (
+        <div className="actions">
+          <ConfirmAction
+            label="Close this loan…"
+            title="Close this loan for the removed member?"
+            confirmLabel="Close the loan"
+            pendingLabel="Closing…"
+            cancelLabel="Leave it open"
+            action={adminCloseAction}
+            fields={fields}
+            danger
+          >
+            <p>
+              {status === "requested" || status === "approved"
+                ? "It hasn't been picked up, so it's cancelled whatever you choose. "
+                : null}
+              The other member is emailed, and the history records you as the one who closed it.
+            </p>
+            <fieldset>
+              <legend>Outcome</legend>
+              <div className="field check">
+                <input id="a-fine" type="radio" name="outcome" value="fine" defaultChecked />
+                <label htmlFor="a-fine">Came back fine</label>
+              </div>
+              <div className="field check">
+                <input id="a-damaged" type="radio" name="outcome" value="damaged" />
+                <label htmlFor="a-damaged">Came back damaged</label>
+              </div>
+              <div className="field check">
+                <input id="a-missing" type="radio" name="outcome" value="not_returned" />
+                <label htmlFor="a-missing">Didn&apos;t come back</label>
+              </div>
+            </fieldset>
+            <div className="field">
+              <label htmlFor="admin-note">Note</label>
+              <textarea id="admin-note" name="note" rows={3} maxLength={2000} required />
+            </div>
+          </ConfirmAction>
+        </div>
+      );
+    }
+    return <p className="muted">Only the two members in this loan can act on it.</p>;
+  }
 
   if (status === "requested" && role === "borrower") {
     return (

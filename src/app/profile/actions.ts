@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/auth";
+import { redirect } from "next/navigation";
+import { requireUser, signOut } from "@/auth";
+import { deleteAccount } from "@/server/account/service";
 import { DomainError } from "@/server/errors";
 import { saveContacts, updateProfile } from "@/server/profiles/service";
 import { PhotoError, processPhoto, savePhoto } from "@/server/storage/photos";
@@ -34,6 +36,20 @@ export async function saveProfileAction(_prev: FormState, formData: FormData): P
   }
   revalidatePath("/", "layout");
   return { status: "saved", message: "Profile saved." };
+}
+
+/** S21: delete the account, then sign out (the sessions are already gone). */
+export async function deleteAccountAction(formData: FormData) {
+  const user = await requireUser();
+  if (!user) redirect("/sign-in");
+  if (formData.get("confirmDelete") !== "yes") redirect("/profile");
+  try {
+    await deleteAccount(user.id);
+  } catch (e) {
+    if (e instanceof DomainError) redirect("/profile");
+    throw e;
+  }
+  await signOut({ redirectTo: "/account-deleted" });
 }
 
 export async function saveContactsAction(_prev: FormState, formData: FormData): Promise<FormState> {

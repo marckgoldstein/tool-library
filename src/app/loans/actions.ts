@@ -10,6 +10,7 @@ import { zonedLocalToUtc } from "@/lib/zoned-time";
 import { DomainError } from "@/server/errors";
 import { cleanTimezone } from "@/server/invitations/service";
 import {
+  adminCloseLoan,
   approveLoan,
   cancelApprovedLoan,
   closeAsNotReturned,
@@ -70,8 +71,32 @@ export async function requestLoanAction(itemId: string, _prev: RequestState, for
     throw e;
   }
   revalidatePath(`/items/${itemId}`);
+  revalidatePath("/", "layout");
   revalidatePath("/loans");
   redirect(`/loans/${loanId}?result=requested`);
+}
+
+// ---------- S23: the admin closes a loan for a removed member ----------
+
+export async function adminCloseAction(formData: FormData) {
+  const user = await requireUser();
+  if (!user) redirect("/sign-in");
+  const loanId = String(formData.get("loanId") ?? "");
+  const outcome = String(formData.get("outcome") ?? "");
+  let result: LoanResult = "closed";
+  try {
+    if (outcome !== "fine" && outcome !== "damaged" && outcome !== "not_returned") {
+      throw new DomainError("invalid_input", "Choose how the item came back.");
+    }
+    await adminCloseLoan(user.id, loanId, outcome, String(formData.get("note") ?? ""));
+  } catch (e) {
+    if (!(e instanceof DomainError)) throw e;
+    if (e.code === "not_found") redirect("/admin/members");
+    result = codeFor(e);
+  }
+  revalidatePath(`/loans/${loanId}`);
+  revalidatePath("/admin/members");
+  redirect(`/loans/${loanId}?result=${result}`);
 }
 
 // ---------- S13, S14, S16, S17, S19, S20: one action, the button says which ----------

@@ -14,6 +14,7 @@ import { db, type Tx } from "@/db";
 import { categories, itemPhotos, items, loans, memberships, users } from "@/db/schema";
 import { DomainError, forbidden, notFound } from "../errors";
 import { isListingLocked } from "../loans/service";
+import { sendEmail, type OutgoingEmail } from "../email/transport";
 
 export const TITLE_MAX = 80;
 export const DESCRIPTION_MAX = 2000;
@@ -138,6 +139,51 @@ export async function setItemStatus(ownerId: string, itemId: string, action: Own
     const [updated] = await tx.update(items).set({ status: to }).where(eq(items.id, item.id)).returning();
     return updated!;
   });
+}
+
+// ---------- S24: admin delists any item ----------
+
+/**
+ * R2: the admin takes down a listing (say, one on the exclusion list) with a note
+ * that's emailed to the owner. Blocked while a loan locks the listing (D23).
+ */
+export async function adminDelistItem(
+  adminId: string,
+  itemId: string,
+  note: string,
+  send: (email: OutgoingEmail) => Promise<unknown> = sendEmail,
+): Promise<Item> {
+  const reason = note.trim();
+  if (!reason) throw new DomainError("invalid_input", "Add a note for the owner explaining why.");
+  if (reason.length > 1000) throw new DomainError("invalid_input", "Keep the note under 1,000 characters.");
+  const { item, owner: ownerRow } = await db.transaction(async (tx) => {
+    const [admin] = await tx
+      .select({ communityId: memberships.communityId, role: users.role })
+      .from(memberships)
+      .innerJoin(users, eq(users.id, memberships.userId))
+      .where(and(eq(memberships.userId, adminId), isNull(memberships.removedAt), eq(users.status, "active")));
+    if (!admin || admin.role !== "admin") throw forbidden("Only the admin can do that.");
+    const [found] = await tx.select().from(items).where(eq(items.id, itemId)).for("update");
+    if (!found || found.communityId !== admin.communityId) throw notFound("Item");
+    if (found.status === "delisted") throw new DomainError("invalid_state", "This item is already delisted.");
+    if (await isListingLocked(found.id, tx)) {
+      throw new DomainError("listing_locked", "This item has an approved or active loan, so it can't be delisted until the loan closes.");
+    }
+    const [updated] = await tx.update(items).set({ status: "delisted" }).where(eq(items.id, found.id)).returning();
+    const [o] = await tx.select({ id: users.id, email: users.email, status: users.status }).from(users).where(eq(users.id, found.ownerId));
+    return { item: updated!, owner: o };
+  });
+  if (ownerRow && ownerRow.status === "active") {
+    await send({
+      to: ownerRow.email,
+      toUserId: ownerRow.id,
+      template: "item.admin_delisted",
+      relatedId: item.id,
+      subject: `Your listing was taken down: ${item.title}`,
+      text: [`The admin took down your listing for ${item.title}.`, `Their note: ${reason}`, "If you think this is a mistake, talk to the admin."].join("\n\n"),
+    }).catch(() => undefined);
+  }
+  return item;
 }
 
 // ---------- reading ----------

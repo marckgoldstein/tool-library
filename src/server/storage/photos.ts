@@ -4,7 +4,7 @@
  *  - "local": files under .data/uploads, served by /media/... (development and tests)
  *  - "r2":    Cloudflare R2 or any S3-compatible bucket (added with hosting, T1)
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
@@ -59,6 +59,12 @@ export async function readPhoto(key: string): Promise<Buffer | null> {
   } catch {
     return null;
   }
+}
+
+/** Remove a stored photo (account deletion). A missing file is fine. */
+export async function deletePhoto(key: string): Promise<void> {
+  driver();
+  await unlink(path.join(LOCAL_ROOT, safeKey(key))).catch(() => undefined);
 }
 
 export const photoUrl = (key: string) => `/media/${safeKey(key)}`;

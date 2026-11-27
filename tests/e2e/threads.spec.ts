@@ -26,7 +26,7 @@ test.describe("M4 threads and contact sharing (S10, S11)", () => {
     await context.clearCookies();
     await signInAs(page, USERS.other);
     await navLink(page, "Messages").click();
-    const row = page.getByTestId("threads").getByRole("listitem").filter({ hasText: "4-person tent" });
+    const row = page.getByTestId("threads").getByRole("listitem").filter({ hasText: "4-person tent" }).filter({ hasText: "asked by Ben" });
     await expect(row).toContainText("asked by Ben");
     await row.getByRole("link", { name: "4-person tent" }).click();
     await expect(page.getByRole("heading", { level: 3, name: "Answer about the item" })).toBeVisible();

@@ -10,7 +10,7 @@
  */
 import { and, count, eq, inArray, isNull, or } from "drizzle-orm";
 import { db, type Tx } from "@/db";
-import { loans, memberships, sessions, users } from "@/db/schema";
+import { items, loans, memberships, sessions, users } from "@/db/schema";
 import { OPEN_STATUSES } from "../loans/rules";
 import { DomainError, forbidden, notFound } from "../errors";
 
@@ -118,6 +118,24 @@ export async function listMembersForAdmin(adminId: string) {
     .where(eq(memberships.communityId, admin.communityId))
     .orderBy(users.name);
   const active = rows.filter((r) => !r.removedAt && r.status === "active");
-  const removed = rows.filter((r) => r.removedAt || r.status !== "active");
+  const removedRows = rows.filter((r) => (r.removedAt || r.status !== "active") && r.status !== "deleted");
+  // S23: open loans a removed member is part of, for the admin to close.
+  const removedIds = removedRows.map((r) => r.id);
+  const openLoans = removedIds.length
+    ? await db
+        .select({ id: loans.id, ownerId: loans.ownerId, borrowerId: loans.borrowerId, itemTitle: items.title, status: loans.status })
+        .from(loans)
+        .innerJoin(items, eq(items.id, loans.itemId))
+        .where(
+          and(
+            inArray(loans.status, [...OPEN_STATUSES, "requested"]),
+            or(inArray(loans.ownerId, removedIds), inArray(loans.borrowerId, removedIds)),
+          ),
+        )
+    : [];
+  const removed = removedRows.map((r) => ({
+    ...r,
+    openLoans: openLoans.filter((l) => l.ownerId === r.id || l.borrowerId === r.id).map((l) => ({ id: l.id, itemTitle: l.itemTitle, status: l.status })),
+  }));
   return { active, removed };
 }

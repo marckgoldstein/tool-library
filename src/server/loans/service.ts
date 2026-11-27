@@ -8,7 +8,7 @@
  *  4. writes a loan_event row in the same transaction (append-only audit),
  *  5. sends emails only after the transaction commits.
  */
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, gt, inArray, ne, or } from "drizzle-orm";
 import { db, type Tx } from "@/db";
 import {
   contactShares,
@@ -27,6 +27,9 @@ import { deliverLoanNotifications, type LoanNotification } from "../email/loan-n
 import { BLOCKING_STATUSES, LOCKING_STATUSES, overlaps, validateRange } from "./rules";
 
 type Loan = typeof loans.$inferSelect;
+
+/** Requests one borrower may send per hour (PRD section 8 rate limits). */
+export const REQUESTS_PER_HOUR = 10;
 
 export interface LoanServiceDeps {
   /** Override in tests to capture notifications instead of sending email. */
@@ -158,6 +161,14 @@ export function requestLoan(input: RequestLoanInput, deps?: LoanServiceDeps) {
       throw new DomainError("invalid_state", "This item isn't available to request right now.");
     }
     await requireActiveMember(tx, input.borrowerId, item.communityId);
+    // PRD section 8: rate limit on requests. Generous for real use, a brake on abuse.
+    const recent = await tx
+      .select({ id: loans.id })
+      .from(loans)
+      .where(and(eq(loans.borrowerId, input.borrowerId), gt(loans.createdAt, new Date(now.getTime() - 3_600_000))));
+    if (recent.length >= REQUESTS_PER_HOUR) {
+      throw new DomainError("conflict", "You've sent a lot of requests in the last hour. Try again a little later.");
+    }
     const rangeError = validateRange(input, now);
     if (rangeError) throw new DomainError("invalid_input", rangeError);
 
@@ -353,6 +364,39 @@ export function closeAsNotReturned(ownerId: string, loanId: string, note: string
     expectStatus(loan, ["active", "returned"]);
     return closeLoan(tx, loan, item, ownerId, "not_returned", requireNote(note), now);
   });
+}
+
+/**
+ * S21: when a member deletes their account, their pending requests are cancelled and
+ * requests for their items are declined, by the system (actor null), inside the
+ * caller's transaction. Open loans (approved, active, returned) block deletion, so
+ * only "requested" loans are touched here. Returns the emails to send after commit.
+ */
+export async function closeRequestsForDeletedMember(tx: Tx, userId: string, now: Date): Promise<LoanNotification[]> {
+  const pending = await tx
+    .select({ id: loans.id })
+    .from(loans)
+    .where(and(eq(loans.status, "requested"), or(eq(loans.borrowerId, userId), eq(loans.ownerId, userId))));
+  const notifications: LoanNotification[] = [];
+  for (const { id } of pending) {
+    const { loan } = await loadLoanForUpdate(tx, id);
+    if (loan.status !== "requested") continue;
+    if (loan.borrowerId === userId) {
+      await transition(tx, loan, "cancelled", null, { closedAt: now }, { note: "The borrower deleted their account." });
+      notifications.push({ type: "loan.withdrawn", loanId: loan.id, toUserIds: [loan.ownerId] });
+    } else {
+      await transition(
+        tx,
+        loan,
+        "declined",
+        null,
+        { closedAt: now, reasonKey: "reason.unavailable" },
+        { reasonKey: "reason.unavailable", note: "The owner deleted their account." },
+      );
+      notifications.push({ type: "loan.declined", loanId: loan.id, toUserIds: [loan.borrowerId], reasonKey: "reason.unavailable" });
+    }
+  }
+  return notifications;
 }
 
 /**
