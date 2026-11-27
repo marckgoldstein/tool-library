@@ -47,20 +47,25 @@ type LoanStatus = typeof loans.$inferSelect.status;
 
 /** The thread's stage comes from its latest loan (S10): what can sensibly be said now. */
 export function stageFromLoan(status: LoanStatus | null | undefined): ThreadStage {
-  if (!status || status === "requested") return "before_pickup";
+  // A declined or cancelled request never reached pickup, so the asker can ask again as before.
+  if (!status || status === "requested" || status === "declined" || status === "cancelled") return "before_pickup";
   if (status === "approved") return "approved";
   if (status === "active" || status === "returned") return "picked_up";
-  return "closed"; // closed, declined, cancelled
+  return "closed"; // a completed loan
 }
 
-async function latestLoanStatus(tx: Tx | typeof db, conversationId: string): Promise<LoanStatus | null> {
+async function latestLoan(tx: Tx | typeof db, conversationId: string) {
   const [row] = await tx
-    .select({ status: loans.status })
+    .select({ id: loans.id, status: loans.status })
     .from(loans)
     .where(eq(loans.conversationId, conversationId))
     .orderBy(desc(loans.createdAt))
     .limit(1);
-  return row?.status ?? null;
+  return row ?? null;
+}
+
+async function latestLoanStatus(tx: Tx | typeof db, conversationId: string): Promise<LoanStatus | null> {
+  return (await latestLoan(tx, conversationId))?.status ?? null;
 }
 
 // ---------- access ----------
@@ -245,11 +250,14 @@ export interface ThreadView {
   savedContactTypes: ContactType[];
   canWrite: boolean;
   hasContactShare: boolean;
+  /** The thread's latest loan, if a request has been made (R3: every loan has a thread). */
+  loanId: string | null;
 }
 
 export async function getThread(viewerId: string, conversationId: string): Promise<ThreadView> {
   const { conversation, role } = await loadThreadForParty(db, viewerId, conversationId);
-  const stage = stageFromLoan(await latestLoanStatus(db, conversation.id));
+  const loan = await latestLoan(db, conversation.id);
+  const stage = stageFromLoan(loan?.status);
   const other = await otherPartyActive(db, conversation, role);
   const [item] = await db.select({ id: items.id, title: items.title, status: items.status }).from(items).where(eq(items.id, conversation.itemId));
   const sender = alias(users, "sender");
@@ -294,6 +302,7 @@ export async function getThread(viewerId: string, conversationId: string): Promi
     savedContactTypes: canWrite ? savedContactTypes : [],
     canWrite,
     hasContactShare: rows.some((r) => r.kind === "contact_share"),
+    loanId: loan?.id ?? null,
   };
 }
 

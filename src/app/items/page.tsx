@@ -9,16 +9,21 @@ export const metadata: Metadata = { title: "Browse items" };
 export const dynamic = "force-dynamic";
 
 /** S9: search the group's items by keyword and category. GET form, so results can be bookmarked and shared. */
-export default async function BrowsePage({ searchParams }: { searchParams: Promise<{ q?: string; category?: string }> }) {
+export default async function BrowsePage({ searchParams }: { searchParams: Promise<{ q?: string; category?: string; result?: string }> }) {
   const user = await requireUser();
   if (!user) redirect("/sign-in");
-  const { q = "", category = "" } = await searchParams;
+  const { q = "", category = "", result } = await searchParams;
   const [categories, results] = await Promise.all([listCategories(), searchItems(user.id, { q, categoryId: category || undefined })]);
   const searching = !!(q.trim() || category);
 
   return (
     <>
       <h1>Browse items</h1>
+      {result === "admin_delisted" && (
+        <p className="notice success" role="status" data-testid="browse-result">
+          Listing taken down. The owner has been emailed your note.
+        </p>
+      )}
       <search>
         <form method="get" action="/items" className="search-form" aria-label="Search items">
           <div className="field">

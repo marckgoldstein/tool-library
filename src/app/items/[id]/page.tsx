@@ -10,8 +10,11 @@ import { DomainError } from "@/server/errors";
 import { activeMembership, cleanTimezone } from "@/server/invitations/service";
 import { getItem, type ItemView } from "@/server/items/service";
 import { photoUrl } from "@/server/storage/photos";
-import { itemStatusAction, type ItemResult } from "../actions";
+import { adminDelistAction, itemStatusAction, type ItemResult } from "../actions";
 import { askOwnerAction } from "../../threads/actions";
+import { RequestForm } from "../../loans/request-form";
+import { openLoanForItem } from "@/server/loans/queries";
+import { alignedLocalMin } from "@/lib/zoned-time";
 
 export const metadata: Metadata = { title: "Item" };
 export const dynamic = "force-dynamic";
@@ -22,6 +25,8 @@ const RESULT: Record<ItemResult, { ok: boolean; text: string }> = {
   paused: { ok: true, text: "Paused. It's hidden from search until you resume it." },
   resumed: { ok: true, text: "Available again. Members can find it in search." },
   delisted: { ok: true, text: "Delisted." },
+  admin_delisted: { ok: true, text: "Taken down. The owner has been emailed your note." },
+  needs_note: { ok: false, text: "Add a note for the owner explaining why, then try again." },
   locked: { ok: false, text: "This item has an approved or active loan, so it can't be changed until the loan closes." },
   failed: { ok: false, text: "That didn't work. Reload the page and try again." },
 };
@@ -35,7 +40,7 @@ const STATUS_LABEL: Record<ItemView["status"], string> = {
 
 const lendingRisk = NOTICES.find((n) => n.id === "lending-risk")!;
 
-/** An item's page, from search (S9). Owners manage it here (S8). Requests arrive with the loan loop (M5). */
+/** An item's page, from search (S9). Owners manage it here (S8); members ask about it (S10) and request dates (S12). */
 export default async function ItemPage({
   params,
   searchParams,
@@ -58,7 +63,9 @@ export default async function ItemPage({
   const category = item.parentCategoryName ? `${item.parentCategoryName} › ${item.categoryName}` : item.categoryName;
   const firstName = item.owner.name.trim().split(/\s+/)[0] ?? item.owner.name;
   const me = await activeMembership(user.id);
-  const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: cleanTimezone(me?.timezone) });
+  const timeZone = cleanTimezone(me?.timezone);
+  const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone });
+  const myLoan = item.isOwner ? null : await openLoanForItem(user.id, item.id);
 
   return (
     <>
@@ -112,9 +119,25 @@ export default async function ItemPage({
           {item.status === "on_loan" && <p>It&apos;s out on loan right now. You can still ask {firstName} about it.</p>}
           <form action={askOwnerAction}>
             <input type="hidden" name="itemId" value={item.id} />
-            <SubmitButton pendingLabel="Opening…">Ask {firstName} about it</SubmitButton>
+            {/* Secondary: requesting dates is the main action on this page, and only one button should lead. */}
+            <SubmitButton pendingLabel="Opening…" className="secondary">
+              Ask {firstName} about it
+            </SubmitButton>
           </form>
           <p className="hint">You pick from a short list of set messages, and {firstName} gets an email.</p>
+          {myLoan ? (
+            <p className="notice" data-testid="my-request">
+              You have a {myLoan.status === "requested" ? "request" : "loan"} for {fmt.format(myLoan.startAt)} to{" "}
+              {fmt.format(myLoan.endAt)}. <Link href={`/loans/${myLoan.id}`}>See where it stands</Link>
+            </p>
+          ) : (
+            <RequestForm
+              itemId={item.id}
+              ownerFirstName={firstName}
+              minLocal={alignedLocalMin(new Date(), timeZone)}
+              timeZoneLabel={timeZone.replaceAll("_", " ")}
+            />
+          )}
           <div className="notices">
             <details>
               <summary>
@@ -125,6 +148,30 @@ export default async function ItemPage({
               <p>{lendingRisk.body}</p>
             </details>
           </div>
+        </section>
+      )}
+
+      {!item.isOwner && user.role === "admin" && item.status !== "delisted" && (
+        <section aria-labelledby="admin-heading" className="admin-tools">
+          <h2 id="admin-heading">Admin</h2>
+          <ConfirmAction
+            label="Take down this listing…"
+            title={`Take down ${item.title}?`}
+            confirmLabel="Take down listing"
+            pendingLabel="Taking down…"
+            cancelLabel="Leave it listed"
+            action={adminDelistAction}
+            fields={{ itemId: item.id }}
+            variant="quiet"
+            danger
+          >
+            <p>It disappears from search. {firstName} is emailed your note. This can&apos;t be undone here.</p>
+            <div className="field">
+              <label htmlFor="admin-note">Note for {firstName}</label>
+              <textarea id="admin-note" name="note" rows={3} maxLength={1000} required />
+              <p className="hint">For example, which part of the exclusion list it falls under.</p>
+            </div>
+          </ConfirmAction>
         </section>
       )}
 

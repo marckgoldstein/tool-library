@@ -16,6 +16,8 @@ export type ThreadStage =
 export interface CannedMessage {
   key: string;
   text: string;
+  /** Narrows the category's roles for a message only one side would say (D24: filtered by role). */
+  roles?: ThreadRole[];
 }
 
 export interface CannedCategory {
@@ -66,8 +68,8 @@ export const CANNED_CATEGORIES: CannedCategory[] = [
     roles: ["asker", "owner"],
     stages: ["approved"],
     messages: [
-      { key: "pickup.ready", text: "It's ready for pickup." },
-      { key: "pickup.on_start", text: "Can I pick it up on the start date?" },
+      { key: "pickup.ready", text: "It's ready for pickup.", roles: ["owner"] },
+      { key: "pickup.on_start", text: "Can I pick it up on the start date?", roles: ["asker"] },
       { key: "pickup.evenings", text: "Evenings work best for me." },
       { key: "pickup.weekends", text: "Weekends work best for me." },
       { key: "pickup.running_late", text: "Running late; I'll send a new time shortly." },
@@ -79,9 +81,9 @@ export const CANNED_CATEGORIES: CannedCategory[] = [
     roles: ["asker", "owner"],
     stages: ["picked_up"],
     messages: [
-      { key: "return.on_way", text: "I'm on my way to return it." },
-      { key: "return.extra_day", text: "I need an extra day; is that OK?" },
-      { key: "return.done", text: "Returned it; please check it over and complete the loan." }, // PRD section 9 wording
+      { key: "return.on_way", text: "I'm on my way to return it.", roles: ["asker"] },
+      { key: "return.extra_day", text: "I need an extra day; is that OK?", roles: ["asker"] },
+      { key: "return.done", text: "Returned it; please check it over and complete the loan.", roles: ["asker"] }, // PRD section 9 wording
     ],
   },
   {
@@ -130,11 +132,24 @@ export function isReasonKey(key: string): boolean {
 
 /** Categories a person may use, given their role and the thread's stage. */
 export function categoriesFor(role: ThreadRole, stage: ThreadStage): CannedCategory[] {
-  return CANNED_CATEGORIES.filter((c) => c.roles.includes(role) && c.stages.includes(stage));
+  return CANNED_CATEGORIES.filter((c) => c.roles.includes(role) && c.stages.includes(stage))
+    .map((c) => ({ ...c, messages: c.messages.filter((m) => !m.roles || m.roles.includes(role)) }))
+    .filter((c) => c.messages.length > 0);
 }
+
+/** The category that fits the stage best; the thread page shows it open and folds the rest. */
+export const MAIN_CATEGORY: Record<ThreadRole, Record<ThreadStage, string>> = {
+  asker: { before_pickup: "ask", approved: "pickup", picked_up: "return", closed: "courtesy" },
+  owner: { before_pickup: "answer", approved: "pickup", picked_up: "courtesy", closed: "courtesy" },
+};
 
 /** Whether a template may be sent by this role at this stage (server-side check). */
 export function isAllowedTemplate(key: string, role: ThreadRole, stage: ThreadStage): boolean {
   const entry = MESSAGE_INDEX.get(key);
-  return !!entry && entry.category.roles.includes(role) && entry.category.stages.includes(stage);
+  return (
+    !!entry &&
+    entry.category.roles.includes(role) &&
+    entry.category.stages.includes(stage) &&
+    (!entry.message.roles || entry.message.roles.includes(role))
+  );
 }

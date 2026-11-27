@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { navLink, signInAs, USERS } from "./helpers";
+import { openMore, signInAs, USERS } from "./helpers";
 
 /** The signed-in member's own profile URL, from the link on /profile. */
 async function ownProfileUrl(page: Page) {
@@ -13,7 +13,7 @@ test.describe("M2 profiles: contact details and profile page (S4, S5)", () => {
   test("a member saves contact details that other members never see", async ({ page, context }, info) => {
     const phone = info.project.name === "mobile" ? "555-010-0177" : "555-010-0166";
     await signInAs(page, USERS.other);
-    await navLink(page, "Profile").click();
+    await (await openMore(page)).getByRole("link", { name: "Your profile" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Your profile" })).toBeVisible();
 
     await page.getByLabel("Phone number").fill(phone);
@@ -50,9 +50,9 @@ test.describe("M2 profiles: contact details and profile page (S4, S5)", () => {
     await expect(page.getByTestId("profile-area")).toHaveText("Maplewood");
     const details = page.getByTestId("profile-details");
     await expect(details).toContainText("Member since");
-    // The seed's loans are active or requested, not closed, so they don't count yet.
-    await expect(page.getByTestId("lent-count")).toHaveText("0 loans");
-    await expect(page.getByTestId("borrowed-count")).toHaveText("0 loans");
+    // Counts include closed loans only; the loan-loop test may already have closed one, so check the shape.
+    await expect(page.getByTestId("lent-count")).toHaveText(/^\d+ loans?$/);
+    await expect(page.getByTestId("borrowed-count")).toHaveText(/^\d+ loans?$/);
     await expect(page.locator("main")).not.toContainText("555-0100"); // Olivia's saved phone stays private
     await expect(page.getByText("This is how other members see you.")).toHaveCount(0);
     // Trust signal: what she lends, right on her profile (Impeccable review).

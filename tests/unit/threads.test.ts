@@ -91,7 +91,9 @@ describe("S10: threads and canned messages", () => {
     expect(stageFromLoan("approved")).toBe("approved");
     expect(stageFromLoan("active")).toBe("picked_up");
     expect(stageFromLoan("returned")).toBe("picked_up");
-    for (const st of ["closed", "declined", "cancelled"] as const) expect(stageFromLoan(st)).toBe("closed");
+    expect(stageFromLoan("closed")).toBe("closed");
+    // A declined or cancelled request never reached pickup: the asker can ask again.
+    for (const st of ["declined", "cancelled"] as const) expect(stageFromLoan(st)).toBe("before_pickup");
   });
 
   it("is readable only by the two people in it, and lists newest first", async () => {

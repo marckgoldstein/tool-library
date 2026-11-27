@@ -22,6 +22,7 @@ Don't change a signed-off rule silently: propose it, and log it as the next D-nu
 - Before building UI, consult the Modern Web Guidance guide for the pattern (`modern-web-guidance` skill) and the Impeccable playbooks (`impeccable` skill); PRODUCT.md holds the product context they read. This is an **Operate** surface: precision and familiar patterns over expression.
 - Forms: real `<form>`, `<label>`, correct `type` and `autocomplete`, errors named with the recovery.
 - Copy: plain, specific, kind. Controls name their action.
+- **Copy Review sheet** (https://claude.ai/artifact/2k3RHWnWYxBp85cG8ENGvL, sheet "Copy"): one row per piece of user-facing copy, with a Source column of `file:line`. Whenever you add, change or remove user-facing copy (pages, dialogs, errors, emails, canned messages, notices), update the matching row's "Current copy" (and Source) in the same piece of work; add rows for new copy and delete rows for removed copy. Never write in "Recommended copy": that column is the reviewers'. To apply a recommendation, change the code, then copy the new wording into "Current copy".
 
 ## Testing rules
 - Every Must story gets at least one Playwright test when its UI ships (D35). Business rules get Vitest tests against the real test database.

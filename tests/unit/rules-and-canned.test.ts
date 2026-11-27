@@ -47,6 +47,18 @@ describe("canned message catalog (D24)", () => {
     expect(isAllowedTemplate("answer.available", "asker", "before_pickup")).toBe(false);
   });
 
+  it("offers each side only the messages that side would send", () => {
+    const ownerPickup = categoriesFor("owner", "approved").find((c) => c.key === "pickup")!.messages.map((m) => m.key);
+    expect(ownerPickup).toContain("pickup.ready");
+    expect(ownerPickup).not.toContain("pickup.on_start");
+    const askerPickup = categoriesFor("asker", "approved").find((c) => c.key === "pickup")!.messages.map((m) => m.key);
+    expect(askerPickup).not.toContain("pickup.ready");
+    // The owner has no return messages to send, so the category drops out.
+    expect(categoriesFor("owner", "picked_up").map((c) => c.key)).toEqual(["courtesy"]);
+    expect(isAllowedTemplate("return.on_way", "owner", "picked_up")).toBe(false);
+    expect(isAllowedTemplate("pickup.ready", "asker", "approved")).toBe(false);
+  });
+
   it("words contact shares as agreed at sign-off", () => {
     expect(contactShareText("555-0100")).toBe("Here's my contact info: 555-0100");
     expect(reasonText("reason.no_show")).toBe("Didn't show up for pickup.");

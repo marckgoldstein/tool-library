@@ -19,8 +19,8 @@ export default async function MessagesPage() {
       <h1>Messages</h1>
       {threads.length === 0 ? (
         <p>
-          No messages yet. To ask about something, open it from <Link href="/items">Browse</Link> and choose{" "}
-          <strong>Ask the owner</strong>.
+          No messages yet. To ask about something, open it from <Link href="/items">Browse</Link> and use the{" "}
+          <strong>Ask … about it</strong> button under the item&apos;s details.
         </p>
       ) : (
         <ul className="rows" data-testid="threads">

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { BrowseLink, MoreMenuLinks, NavLink, SignInLink, YourItemsLink } from "@/components/site-nav";
 import { pendingCount } from "@/server/invitations/service";
+import { loansNeedingAction } from "@/server/loans/queries";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,6 +23,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const session = await auth();
   const isAdmin = session?.user?.role === "admin";
   const pending = isAdmin ? await pendingCount(session!.user.id) : 0;
+  const loanTodo = session?.user ? await loansNeedingAction(session.user.id) : 0;
   return (
     <html lang="en">
       <body>
@@ -39,13 +41,23 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <BrowseLink />
                 </li>
                 <li>
+                  <NavLink href="/loans">
+                    Loans
+                    {loanTodo > 0 ? (
+                      <>
+                        <span className="count" aria-hidden="true">
+                          {loanTodo}
+                        </span>
+                        <span className="visually-hidden">, {loanTodo} waiting on you</span>
+                      </>
+                    ) : null}
+                  </NavLink>
+                </li>
+                <li>
                   <YourItemsLink />
                 </li>
                 <li>
                   <NavLink href="/threads">Messages</NavLink>
-                </li>
-                <li>
-                  <NavLink href="/profile">Profile</NavLink>
                 </li>
                 <li>
                   {/* Native popover (D33): light dismiss and Escape come built in. */}
@@ -55,6 +67,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <div id="more-menu" popover="auto" className="nav-more">
                     <MoreMenuLinks>
                       <ul>
+                        <li>
+                          <NavLink href="/profile">Your profile</NavLink>
+                        </li>
                         <li>
                           <NavLink href="/invite">Suggest someone</NavLink>
                         </li>
